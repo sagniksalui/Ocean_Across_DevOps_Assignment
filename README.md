@@ -25,8 +25,8 @@ customer data.
 | AWS infrastructure | Implemented as modular Terraform and suitable for static review and planning |
 | Placeholder backend | Implemented in Python with `/health` and `/portal` endpoints, unit tests, and a non-root Docker image |
 | CI/CD | Build/test workflow implemented; SSM deployment is manual, disabled by default, and dependent on external controls listed below |
-| Architecture and operations | ADR, Mermaid diagram, multi-tenancy design, security controls, incident runbook, and UK GDPR considerations included |
-| AI usage log | Exact recorded prompts are in `ai_log.md`; author-review placeholders must be completed before submission |
+| Architecture and operations | Standalone PNG/SVG and Mermaid diagrams, ADR, multi-tenancy design, security controls, incident runbook, and UK GDPR considerations included |
+| AI usage log | Complete prompts, key outputs, and reviewed adaptations are recorded in `AI_USAGE_LOG.md` |
 | Live AWS environment | Not asserted and not required to evaluate the repository |
 
 ### Contents
@@ -87,6 +87,13 @@ cost-conscious but intentionally incomplete for live administration and package
 installation. VPC endpoints or another controlled egress design are required
 before SSM, S3, CloudWatch, Secrets Manager, Parameter Store, and package
 repositories can be reached from private instances.
+
+The standalone submission diagram is available as
+[`docs/architecture.png`](docs/architecture.png), with an editable
+[`docs/architecture.svg`](docs/architecture.svg) version. The Mermaid source
+below provides the same design in a text-reviewable format.
+
+![Ocean Across AWS architecture](docs/architecture.png)
 
 ```mermaid
 flowchart TB
@@ -259,6 +266,8 @@ For the rationale behind these choices, see
 |   |-- src/app.py                     # /health and /portal endpoints
 |   `-- tests/test_app.py              # Standard-library unit tests
 |-- docs/
+|   |-- architecture.png               # Standalone architecture diagram
+|   |-- architecture.svg               # Standalone AWS architecture diagram
 |   |-- GITHUB_ACTIONS_SECURITY_AUDIT.md
 |   `-- decisions/
 |       `-- ADR-0001-security-first-aws-architecture.md
@@ -277,8 +286,7 @@ For the rationale behind these choices, see
 |       |-- networking/                 # VPC, subnets, routes, Internet Gateway
 |       |-- security/                   # Security groups and NACLs
 |       `-- storage/                    # Private encrypted versioned S3 bucket
-|-- AI_USAGE_LOG.md                    # Original detailed interaction record
-|-- ai_log.md                          # Submission-format AI interaction log
+|-- AI_USAGE_LOG.md                    # Complete prompt and AI usage record
 |-- Ocean Across DevOps Assignment.pdf # Source assignment brief
 `-- README.md
 ```
@@ -400,6 +408,25 @@ remain in the service's scoped Secrets Manager or Parameter Store path and are
 read by the application instance role, not by GitHub Actions. If any unrelated
 third-party credential is later required, store it as a protected GitHub
 Environment secret and avoid passing it to untrusted steps.
+
+### Service and portal target model
+
+The workflow's `frontend`, `backend`, and `ai` values are independently
+deployable **service categories** owned by different teams. Terraform's
+`companies`, `bureaus`, and `employees` values are isolated **portal hosts**.
+They are separate dimensions rather than interchangeable names:
+
+| Workflow target | Assignment implementation | Required live mapping |
+| --- | --- | --- |
+| `backend` | Builds the repository's placeholder backend image | Point `BACKEND_INSTANCE_ID` at one explicitly tagged portal backend, or extend the workflow with a reviewed portal matrix |
+| `frontend` | Demonstrates an independent team deployment lane | Provision and tag a frontend target before enabling deployment |
+| `ai` | Demonstrates an independent team deployment lane | Provision and tag an AI target before enabling deployment |
+
+This keeps the required multi-team pipeline structure visible without claiming
+that Terraform currently provisions frontend or AI workloads. Each configured
+target uses its own OIDC role, instance ID, environment gate, and concurrency
+group, so a team cannot accidentally select another service's deployment role
+or target through the workflow input alone.
 
 ### Live deployment dependencies and limitations
 

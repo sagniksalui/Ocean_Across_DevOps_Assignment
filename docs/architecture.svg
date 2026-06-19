@@ -1,0 +1,135 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1120" viewBox="0 0 1600 1120" role="img" aria-labelledby="title description">
+  <title id="title">Ocean Across payroll platform AWS architecture</title>
+  <desc id="description">Security-first AWS design with isolated Companies, Bureaus, and Employees portal hosts, private PostgreSQL, tenant-prefixed S3 storage, IAM roles, monitoring, and an optional GitHub Actions deployment path.</desc>
+  <defs>
+    <style>
+      .title { font: 700 30px Arial, sans-serif; fill: #0f172a; }
+      .subtitle { font: 16px Arial, sans-serif; fill: #475569; }
+      .section { font: 700 18px Arial, sans-serif; fill: #0f172a; }
+      .label { font: 700 15px Arial, sans-serif; fill: #0f172a; }
+      .text { font: 14px Arial, sans-serif; fill: #334155; }
+      .small { font: 12px Arial, sans-serif; fill: #475569; }
+      .aws { fill: #f8fafc; stroke: #334155; stroke-width: 3; }
+      .vpc { fill: #ffffff; stroke: #1e3a8a; stroke-width: 3; }
+      .public { fill: #fff7ed; stroke: #c2410c; stroke-width: 2; }
+      .private { fill: #eff6ff; stroke: #1d4ed8; stroke-width: 2; }
+      .database { fill: #fef2f2; stroke: #b91c1c; stroke-width: 2; }
+      .managed { fill: #faf5ff; stroke: #7e22ce; stroke-width: 2; }
+      .identity { fill: #f0fdf4; stroke: #15803d; stroke-width: 2; }
+      .external { fill: #ffffff; stroke: #64748b; stroke-width: 2; }
+      .arrow { fill: none; stroke: #334155; stroke-width: 2; marker-end: url(#arrow); }
+      .dashed { fill: none; stroke: #64748b; stroke-width: 2; stroke-dasharray: 8 7; marker-end: url(#arrow-muted); }
+    </style>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#334155"/>
+    </marker>
+    <marker id="arrow-muted" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#64748b"/>
+    </marker>
+  </defs>
+
+  <rect width="1600" height="1120" fill="#ffffff"/>
+  <text x="60" y="50" class="title">Ocean Across Payroll Platform</text>
+  <text x="60" y="78" class="subtitle">Security-first assignment architecture | AWS eu-west-2 (London) | Solid = configured logical access | Dashed = intended live dependency</text>
+
+  <rect x="40" y="105" width="1520" height="940" rx="18" class="aws"/>
+  <text x="65" y="138" class="section">AWS account - eu-west-2</text>
+
+  <rect x="65" y="165" width="1060" height="700" rx="15" class="vpc"/>
+  <text x="90" y="198" class="section">VPC 10.20.0.0/16</text>
+  <text x="935" y="198" class="small">No NAT Gateway</text>
+
+  <rect x="90" y="220" width="1010" height="105" rx="12" class="public"/>
+  <text x="110" y="250" class="label">Public ingress tier</text>
+  <rect x="285" y="240" width="210" height="62" rx="9" class="external"/>
+  <text x="328" y="267" class="label">Public subnet A</text>
+  <text x="321" y="287" class="small">No workload deployed</text>
+  <rect x="535" y="240" width="210" height="62" rx="9" class="external"/>
+  <text x="578" y="267" class="label">Public subnet B</text>
+  <text x="571" y="287" class="small">No workload deployed</text>
+  <rect x="790" y="240" width="270" height="62" rx="9" class="external"/>
+  <text x="839" y="267" class="label">Future HTTPS ingress</text>
+  <text x="834" y="287" class="small">Load balancer not provisioned</text>
+
+  <rect x="90" y="350" width="1010" height="265" rx="12" class="private"/>
+  <text x="110" y="382" class="label">Private application tier - no public route</text>
+
+  <rect x="120" y="410" width="285" height="165" rx="12" class="private"/>
+  <text x="190" y="442" class="label">Companies boundary</text>
+  <text x="165" y="466" class="small">Private subnet + NACL + SG</text>
+  <rect x="157" y="490" width="210" height="58" rx="8" class="external"/>
+  <text x="188" y="515" class="label">Companies EC2</text>
+  <text x="207" y="535" class="small">t3.micro</text>
+
+  <rect x="452" y="410" width="285" height="165" rx="12" class="private"/>
+  <text x="531" y="442" class="label">Bureaus boundary</text>
+  <text x="497" y="466" class="small">Private subnet + NACL + SG</text>
+  <rect x="489" y="490" width="210" height="58" rx="8" class="external"/>
+  <text x="532" y="515" class="label">Bureaus EC2</text>
+  <text x="539" y="535" class="small">t3.micro</text>
+
+  <rect x="784" y="410" width="285" height="165" rx="12" class="private"/>
+  <text x="851" y="442" class="label">Employees boundary</text>
+  <text x="829" y="466" class="small">Private subnet + NACL + SG</text>
+  <rect x="821" y="490" width="210" height="58" rx="8" class="external"/>
+  <text x="854" y="515" class="label">Employees EC2</text>
+  <text x="871" y="535" class="small">t3.micro</text>
+
+  <rect x="90" y="640" width="1010" height="190" rx="12" class="database"/>
+  <text x="110" y="672" class="label">Private database tier</text>
+  <rect x="145" y="700" width="220" height="70" rx="9" class="external"/>
+  <text x="194" y="729" class="label">DB subnet A</text>
+  <text x="184" y="751" class="small">Availability Zone A</text>
+  <rect x="440" y="690" width="310" height="100" rx="10" class="database"/>
+  <text x="505" y="720" class="label">RDS PostgreSQL</text>
+  <text x="481" y="744" class="small">db.t3.micro | encrypted | TLS</text>
+  <text x="478" y="765" class="small">PubliclyAccessible = false</text>
+  <rect x="825" y="700" width="220" height="70" rx="9" class="external"/>
+  <text x="874" y="729" class="label">DB subnet B</text>
+  <text x="864" y="751" class="small">Availability Zone B</text>
+
+  <path d="M262 548 L535 690" class="arrow"/>
+  <path d="M594 548 L594 690" class="arrow"/>
+  <path d="M926 548 L655 690" class="arrow"/>
+  <text x="676" y="625" class="small">TLS 5432; source SGs only</text>
+
+  <rect x="1150" y="165" width="380" height="190" rx="12" class="identity"/>
+  <text x="1172" y="198" class="label">IAM and runtime configuration</text>
+  <text x="1180" y="232" class="text">Companies EC2 role</text>
+  <text x="1180" y="262" class="text">Bureaus EC2 role</text>
+  <text x="1180" y="292" class="text">Employees EC2 role</text>
+  <text x="1180" y="322" class="small">Scoped SSM parameter paths; no hardcoded credentials</text>
+
+  <rect x="1150" y="380" width="380" height="205" rx="12" class="managed"/>
+  <text x="1172" y="413" class="label">Private encrypted S3 storage</text>
+  <text x="1180" y="450" class="text">companies/{company_id}/*</text>
+  <text x="1180" y="482" class="text">bureaus/{bureau_id}/*</text>
+  <text x="1180" y="514" class="text">employees/{company_id}/{employee_id}/*</text>
+  <text x="1180" y="550" class="small">Versioning + Block Public Access + TLS-only policy</text>
+
+  <rect x="1150" y="610" width="380" height="180" rx="12" class="managed"/>
+  <text x="1172" y="643" class="label">Monitoring and incident alerts</text>
+  <text x="1180" y="681" class="text">CloudWatch log groups</text>
+  <text x="1180" y="711" class="text">EC2 CPU + RDS connection alarms</text>
+  <text x="1180" y="741" class="text">SNS critical alert topic</text>
+  <text x="1180" y="770" class="small">Missing data is treated as an incident signal</text>
+
+  <rect x="1150" y="815" width="380" height="190" rx="12" class="external"/>
+  <text x="1172" y="848" class="label">Optional CI/CD deployment path</text>
+  <text x="1180" y="882" class="text">GitHub Actions + OIDC roles</text>
+  <text x="1180" y="912" class="text">Dedicated S3 artifact bucket</text>
+  <text x="1180" y="942" class="text">SSM Run Command to exact tagged target</text>
+  <text x="1180" y="976" class="small">Disabled until roles, endpoints, bucket, and targets exist</text>
+
+  <path d="M1125 250 L1150 250" class="arrow"/>
+  <path d="M1125 470 L1150 470" class="arrow"/>
+  <path d="M1125 700 L1150 700" class="arrow"/>
+  <path d="M1150 910 L1045 540" class="dashed"/>
+
+  <rect x="70" y="890" width="1025" height="115" rx="12" fill="#f8fafc" stroke="#94a3b8" stroke-width="2"/>
+  <text x="92" y="923" class="label">Defence in depth</text>
+  <text x="92" y="953" class="text">Portal SG/NACL/IAM boundaries prevent cross-portal access. Application authorization and PostgreSQL forced RLS enforce customer and employee scope.</text>
+  <text x="92" y="980" class="text">Private EC2 requires VPC endpoints or controlled egress for SSM, S3, CloudWatch, secrets, packages, and artifact retrieval.</text>
+
+  <text x="60" y="1090" class="small">Assignment reference architecture. No live AWS deployment is asserted. See README.md and ADR-0001 for assumptions, trade-offs, and residual risks.</text>
+</svg>

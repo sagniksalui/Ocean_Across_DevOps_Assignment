@@ -1232,3 +1232,170 @@ targets and representative corrected snippets.
   documented recommendations.
 - Ran all four Python unit tests successfully and parsed the GitHub Actions YAML;
   Terraform and dedicated security scanners were unavailable in the environment.
+
+## Entry 23 - Structured AI Interaction Log
+
+**Date:** 2026-06-19
+
+**Tool:** OpenAI Codex
+
+**Exact prompt:**
+
+> Create an ai_log.md file for this assignment.
+>
+> Use the following structure for each AI interaction:
+> - Prompt number
+> - Exact prompt used
+> - Summary of AI output
+> - What I accepted
+> - What I changed
+> - What I rejected
+> - Why the change or rejection was necessary
+>
+> Use a transparent tone. Make it clear that I used AI as an assistant, but I reviewed and adapted the output for security, cost, and assignment fit.
+>
+> Do not invent prompts I did not use. Use placeholders where I need to paste my real prompts.
+
+**Response or key output used:**
+
+The response generated a second interaction log from the 22 prompts already in
+this file and added explicit author-review placeholders where personal decisions
+could not be established from repository history.
+
+**Changes, adaptations, or rejections:**
+
+- Retained the requirement to record exact prompts, key output, and reviewed
+  changes or rejections for every interaction.
+- Rejected the generated duplicate before submission because unresolved
+  placeholders made it incomplete and two overlapping logs obscured which one
+  was authoritative.
+- Kept this existing complete record as the single source of truth and appended
+  the later interactions here.
+
+## Entry 24 - Strict Review and Corrected Version
+
+**Date:** 2026-06-19
+
+**Tool:** OpenAI Codex
+
+**Exact prompt:**
+
+> Review your all previous answers as a strict DevOps security reviewer.
+>
+> Do not praise the solution.
+>
+> Find weaknesses, unsafe defaults, missing assignment requirements, unnecessary cost, and places where the README might overclaim.
+>
+> Then provide a corrected version.
+
+**Response or key output used:**
+
+The response re-audited the assignment brief, Terraform, workflow, application,
+ADR, security audit, README, and AI log. It corrected deployment defaults,
+replaced arbitrary SSM shell content with a validated account-owned document and
+fixed host script, added Terraform CI validation and infrastructure log groups,
+made missing metrics alert, removed optional KMS from the cost-constrained
+baseline, and rewrote unsupported implementation claims as explicit design
+gaps.
+
+**Changes, adaptations, or rejections:**
+
+- Retained the fail-closed manual deployment default, exact target validation,
+  account-owned SSM document, digest checks, and protected production gates.
+- Retained Terraform validation, infrastructure log groups, missing-data alarm
+  behavior, and documentation that separates intended architecture from live
+  proof.
+- Retained the assignment-safe encryption baseline and documented customer-
+  managed KMS keys only as a production improvement because KMS was outside the
+  assignment's stated safe-service list.
+- Did not claim that external OIDC roles, an artifact bucket, VPC endpoints,
+  runtime RLS roles, log shipping, or frontend/AI hosts were provisioned.
+
+## Entry 25 - Submission Completeness Review
+
+**Date:** 2026-06-19
+
+**Tool:** OpenAI Codex
+
+**Exact prompt:**
+
+> Prompt- Email- Assignment for the role of DevOps Engineer at Ocean Across
+>
+> Hi Sagnik
+>
+> This email pertains to your application for the DevOps Engineer position at Ocean Across. As part of the selection process, please find the attached assignment, which we request you complete and submit within the next 48 hours.
+>
+> Kindly include the complete prompt log used to generate the code.
+>
+> Please do not hesitate to contact us if you have any questions regarding this matter.
+>
+> My repo link- https://github.com/sagniksalui/Ocean_Across_DevOps_Assignment
+>
+> Check my repo based on the mail and the attachment and tell me what else is missing from my repo based on the ask and also draft the reply mail for me.
+
+**Response or key output used:**
+
+The review compared the public repository with the assignment and found the
+core Terraform, placeholder app, CI/CD, README, runbook, and compliance content
+present. It identified two submission blockers: the duplicate `ai_log.md`
+contained unresolved placeholders, and the architecture existed only as Mermaid
+source rather than the requested standalone image or PDF. It also recommended a
+clear note about the workflow service names and Terraform portal hosts and
+provided a draft submission email.
+
+**Changes, adaptations, or rejections:**
+
+- Accepted the two concrete submission gaps after confirming them against the
+  local assignment PDF and repository.
+- Accepted the recommendation to clarify the service-to-portal deployment model.
+- Rejected any implication that a successful workflow proves a live AWS
+  deployment; the README continues to state the external dependencies and
+  disabled deployment default.
+- Adapted the email to retain the explicit statement that no live AWS resources
+  were provisioned.
+
+## Entry 26 - Implement Submission Fixes
+
+**Date:** 2026-06-19
+
+**Tool:** OpenAI Codex
+
+**Exact prompt:**
+
+> Implement the fixes based on my prompt and answer to the prompt.
+>
+> Prompt- Email- Assignment for the role of DevOps Engineer at Ocean Across
+>
+> Hi Sagnik
+>
+> This email pertains to your application for the DevOps Engineer position at Ocean Across. As part of the selection process, please find the attached assignment, which we request you complete and submit within the next 48 hours.
+>
+> Kindly include the complete prompt log used to generate the code.
+>
+> Please do not hesitate to contact us if you have any questions regarding this matter.
+>
+> My repo link- https://github.com/sagniksalui/Ocean_Across_DevOps_Assignment
+>
+> Check my repo based on the mail and the attachment and tell me what else is missing from my repo based on the ask and also draft the reply mail for me.
+
+**Response or key output used:**
+
+The response inspected the assignment PDF, prior completeness review, local Git
+state, README, workflow, Terraform, and both AI logs. It implemented the missing
+standalone diagram and documentation corrections, consolidated the prompt log,
+and ran focused repository validation.
+
+**Changes, adaptations, or rejections:**
+
+- Added `docs/architecture.svg`, rendered a reviewer-friendly
+  `docs/architecture.png`, and linked both from the architecture section while
+  retaining Mermaid as reviewable source.
+- Removed the incomplete duplicate `ai_log.md` and made this complete log the
+  only authoritative AI record.
+- Updated README deliverable status and repository structure so neither claims
+  that author placeholders remain.
+- Added an explicit service/portal target table: `frontend`, `backend`, and `ai`
+  are workflow service categories, while `companies`, `bureaus`, and `employees`
+  are Terraform portal hosts.
+- Preserved fail-closed deployment limitations rather than inventing resources
+  or mappings that the Terraform does not create.
