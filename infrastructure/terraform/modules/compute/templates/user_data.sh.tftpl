@@ -1,0 +1,24 @@
+#!/bin/bash
+set -euo pipefail
+
+# This bootstrap contains no credentials or application secrets. Runtime secrets
+# must be retrieved by the application through its scoped instance role.
+install -d -m 0750 -o ec2-user -g ec2-user "/opt/ocean-across/${portal}"
+
+cat > "/opt/ocean-across/${portal}/README.txt" <<'EOF'
+Placeholder directory for the ${portal} portal backend in ${environment}.
+Deploy immutable, tested application artifacts here through the approved pipeline.
+EOF
+
+chown ec2-user:ec2-user "/opt/ocean-across/${portal}/README.txt"
+chmod 0640 "/opt/ocean-across/${portal}/README.txt"
+
+# Docker installation requires package-repository connectivity. The current
+# no-NAT private subnet topology needs controlled egress, suitable VPC endpoints,
+# or a pre-baked AMI before this bootstrap can complete during a live deployment.
+if ! command -v docker >/dev/null 2>&1; then
+  dnf install -y docker
+fi
+
+systemctl enable --now docker
+usermod -aG docker ec2-user

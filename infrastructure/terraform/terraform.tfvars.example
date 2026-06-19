@@ -1,0 +1,46 @@
+# Copy to terraform.tfvars for local use. Never place credentials or secrets here.
+
+aws_region  = "eu-west-2"
+environment = "dev"
+vpc_cidr    = "10.20.0.0/16"
+
+public_subnet_cidrs = ["10.20.10.0/24", "10.20.11.0/24"]
+
+private_app_subnet_cidrs = {
+  companies = "10.20.20.0/24"
+  bureaus   = "10.20.21.0/24"
+  employees = "10.20.22.0/24"
+}
+
+private_db_subnet_cidrs = ["10.20.100.0/24", "10.20.101.0/24"]
+
+application_port    = 443
+https_ingress_cidrs = ["0.0.0.0/0"]
+
+# Keep null to disable SSH. If absolutely required, use a routed VPN or bastion
+# CIDR such as "10.20.10.10/32". The module rejects "0.0.0.0/0" for SSH.
+ssh_allowed_cidr = null
+
+instance_types = {
+  companies = "t3.micro"
+  bureaus   = "t3.micro"
+  employees = "t3.micro"
+}
+
+# Pin this for reproducible live environments. Null discovers the latest
+# Amazon Linux 2023 x86_64 AMI during planning.
+ec2_ami_id     = null
+resource_owner = "PlatformEngineering"
+
+db_name                              = "payroll"
+db_instance_class                    = "db.t3.micro"
+db_engine_version                    = "16"
+db_master_username                   = "payroll_admin"
+db_backup_retention_days             = 7
+rds_deletion_protection              = false
+log_retention_days                   = 30
+ec2_cpu_threshold_percent            = 80
+rds_connection_threshold             = 80
+# alert_email = "platform-alerts@example.com" # Optional; requires SNS email confirmation.
+# sns_kms_key_arn = "arn:aws:kms:eu-west-2:123456789012:key/00000000-0000-0000-0000-000000000000" # Optional CMK with CloudWatch permissions.
+s3_noncurrent_version_retention_days = 90

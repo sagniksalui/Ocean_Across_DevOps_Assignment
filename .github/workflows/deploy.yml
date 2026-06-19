@@ -1,0 +1,549 @@
+name: Build, test, and deploy
+
+"on":
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+    inputs:
+      service:
+        description: Team or service to deploy
+        required: true
+        default: backend
+        type: choice
+        options:
+          - frontend
+          - backend
+          - ai
+      target_environment:
+        description: GitHub Environment and AWS target
+        required: true
+        default: dev
+        type: choice
+        options:
+          - dev
+          - production
+      confirm_production:
+        description: Type deploy-production when targeting production
+        required: false
+        default: ""
+        type: string
+
+# The default token is read-only. Only the deployment job can request an OIDC
+# identity token, which it exchanges for short-lived AWS credentials.
+permissions:
+  contents: read
+
+jobs:
+  build-and-test:
+    name: Build and test
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    outputs:
+      service: ${{ steps.selection.outputs.service }}
+      target_environment: ${{ steps.selection.outputs.target_environment }}
+      image_name: ${{ steps.selection.outputs.image_name }}
+      image_digest: ${{ steps.package.outputs.image_digest }}
+
+    steps:
+      - name: Validate deployment selection
+        id: selection
+        env:
+          # Pushes use a predictable non-production default. Manual runs select
+          # one service and environment without editing this workflow.
+          REQUESTED_SERVICE: ${{ github.event_name == 'workflow_dispatch' && inputs.service || 'backend' }}
+          REQUESTED_ENVIRONMENT: ${{ github.event_name == 'workflow_dispatch' && inputs.target_environment || 'dev' }}
+          PRODUCTION_CONFIRMATION: ${{ github.event_name == 'workflow_dispatch' && inputs.confirm_production || '' }}
+          EVENT_NAME: ${{ github.event_name }}
+          REF_PROTECTED: ${{ github.ref_protected }}
+        run: |
+          set -euo pipefail
+
+          case "$REQUESTED_SERVICE" in
+            frontend|backend|ai) ;;
+            *) echo "Unsupported service selection." >&2; exit 1 ;;
+          esac
+          case "$REQUESTED_ENVIRONMENT" in
+            dev|production) ;;
+            *) echo "Unsupported environment selection." >&2; exit 1 ;;
+          esac
+
+          if [ "$REQUESTED_ENVIRONMENT" = production ]; then
+            expected_workflow_ref="$GITHUB_REPOSITORY/.github/workflows/deploy.yml@refs/heads/main"
+            if [ "$EVENT_NAME" != workflow_dispatch ] || \
+               [ "$GITHUB_REF" != refs/heads/main ] || \
+               [ "$GITHUB_WORKFLOW_REF" != "$expected_workflow_ref" ] || \
+               [ "$REF_PROTECTED" != true ] || \
+               [ "$PRODUCTION_CONFIRMATION" != deploy-production ]; then
+              echo "Production requires a manual run of this workflow from protected main and exact confirmation." >&2
+              exit 1
+            fi
+          fi
+
+          printf 'service=%s\n' "$REQUESTED_SERVICE" >> "$GITHUB_OUTPUT"
+          printf 'target_environment=%s\n' "$REQUESTED_ENVIRONMENT" >> "$GITHUB_OUTPUT"
+          printf 'image_name=ocean-across-%s:%s\n' "$REQUESTED_SERVICE" "$GITHUB_SHA" >> "$GITHUB_OUTPUT"
+
+      # Full commit SHAs prevent a moved action tag from changing trusted code.
+      - name: Check out repository
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6
+        with:
+          python-version: "3.12"
+
+      - name: Run unit tests
+        run: python -m unittest discover -s app/tests -v
+
+      - name: Build Docker image
+        env:
+          IMAGE_NAME: ${{ steps.selection.outputs.image_name }}
+        run: docker build --pull --tag "$IMAGE_NAME" app
+
+      - name: Smoke-test container endpoints
+        env:
+          IMAGE_NAME: ${{ steps.selection.outputs.image_name }}
+          SERVICE: ${{ steps.selection.outputs.service }}
+        run: |
+          set -euo pipefail
+          docker run --detach \
+            --name ocean-across-smoke-test \
+            --read-only \
+            --tmpfs /tmp:rw,noexec,nosuid,size=16m \
+            --cap-drop ALL \
+            --security-opt no-new-privileges:true \
+            --publish 127.0.0.1:18080:8080 \
+            --env "PORTAL_TYPE=$SERVICE" \
+            "$IMAGE_NAME"
+
+          for attempt in {1..15}; do
+            if curl --fail --silent http://127.0.0.1:18080/health > /dev/null; then
+              break
+            fi
+            if [ "$attempt" -eq 15 ]; then
+              echo "Container health check failed." >&2
+              exit 1
+            fi
+            sleep 2
+          done
+
+          test "$(curl --fail --silent http://127.0.0.1:18080/portal)" = \
+            "{\"portal_type\":\"$SERVICE\"}"
+
+      - name: Stop smoke-test container
+        if: always()
+        run: docker rm --force ocean-across-smoke-test 2>/dev/null || true
+
+      # GitHub's temporary artifact connects the jobs. The deploy job rechecks
+      # this digest before obtaining AWS credentials or uploading executable code.
+      - name: Package Docker image
+        id: package
+        env:
+          IMAGE_NAME: ${{ steps.selection.outputs.image_name }}
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/image-bundle"
+          docker save "$IMAGE_NAME" | gzip -9 > "$RUNNER_TEMP/image-bundle/image.tar.gz"
+          cd "$RUNNER_TEMP/image-bundle"
+          image_digest="$(sha256sum image.tar.gz | cut -d ' ' -f 1)"
+          printf '%s  image.tar.gz\n' "$image_digest" > image.tar.gz.sha256
+          printf 'image_digest=%s\n' "$image_digest" >> "$GITHUB_OUTPUT"
+
+      - name: Upload image bundle for deployment job
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: image-${{ steps.selection.outputs.service }}-${{ github.sha }}-${{ github.run_id }}
+          path: ${{ runner.temp }}/image-bundle/
+          if-no-files-found: error
+          retention-days: 1
+
+  deploy:
+    name: Deploy ${{ needs.build-and-test.outputs.service }} to ${{ needs.build-and-test.outputs.target_environment }}
+    needs: build-and-test
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+
+    # Create GitHub Environments named `dev` and `production`. Configure required
+    # reviewers, prevent self-review, disable admin bypass, and allow protected
+    # main only for production. Environment protection happens before this job
+    # receives its variables or can request an AWS identity token.
+    environment:
+      name: ${{ needs.build-and-test.outputs.target_environment }}
+
+    # Different service/environment pairs deploy independently. Overlapping
+    # deployments to the same target remain serialized and are never cancelled.
+    concurrency:
+      group: deploy-${{ needs.build-and-test.outputs.target_environment }}-${{ needs.build-and-test.outputs.service }}
+      cancel-in-progress: false
+
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      - name: Download tested image bundle
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          name: image-${{ needs.build-and-test.outputs.service }}-${{ github.sha }}-${{ github.run_id }}
+          path: ${{ runner.temp }}/image-bundle
+
+      - name: Verify tested image bundle
+        env:
+          EXPECTED_DIGEST: ${{ needs.build-and-test.outputs.image_digest }}
+        run: |
+          set -euo pipefail
+          cd "$RUNNER_TEMP/image-bundle"
+          [[ "$EXPECTED_DIGEST" =~ ^[0-9a-f]{64}$ ]]
+          sha256sum --check image.tar.gz.sha256
+          actual_digest="$(sha256sum image.tar.gz | cut -d ' ' -f 1)"
+          [ "$actual_digest" = "$EXPECTED_DIGEST" ]
+
+      # Each service uses a distinct role and target. These values are non-secret
+      # GitHub Environment variables. Runtime application secrets stay in SSM
+      # Parameter Store or Secrets Manager and never enter this workflow.
+      - name: Select least-privilege AWS target
+        id: target
+        env:
+          SERVICE: ${{ needs.build-and-test.outputs.service }}
+          TARGET_ENVIRONMENT: ${{ needs.build-and-test.outputs.target_environment }}
+          AWS_REGION: ${{ vars.AWS_REGION }}
+          DEPLOYMENT_BUCKET: ${{ vars.DEPLOYMENT_BUCKET }}
+          FRONTEND_INSTANCE_ID: ${{ vars.FRONTEND_INSTANCE_ID }}
+          BACKEND_INSTANCE_ID: ${{ vars.BACKEND_INSTANCE_ID }}
+          AI_INSTANCE_ID: ${{ vars.AI_INSTANCE_ID }}
+          FRONTEND_DEPLOY_ROLE_ARN: ${{ vars.FRONTEND_DEPLOY_ROLE_ARN }}
+          BACKEND_DEPLOY_ROLE_ARN: ${{ vars.BACKEND_DEPLOY_ROLE_ARN }}
+          AI_DEPLOY_ROLE_ARN: ${{ vars.AI_DEPLOY_ROLE_ARN }}
+          PRODUCTION_DEPLOYMENTS_ENABLED: ${{ vars.PRODUCTION_DEPLOYMENTS_ENABLED }}
+        run: |
+          set -euo pipefail
+
+          case "$SERVICE" in
+            frontend)
+              instance_id="$FRONTEND_INSTANCE_ID"
+              role_arn="$FRONTEND_DEPLOY_ROLE_ARN"
+              service_tag=Frontend
+              ;;
+            backend)
+              instance_id="$BACKEND_INSTANCE_ID"
+              role_arn="$BACKEND_DEPLOY_ROLE_ARN"
+              service_tag=Backend
+              ;;
+            ai)
+              instance_id="$AI_INSTANCE_ID"
+              role_arn="$AI_DEPLOY_ROLE_ARN"
+              service_tag=AI
+              ;;
+            *) echo "Unsupported service." >&2; exit 1 ;;
+          esac
+
+          if [ "$TARGET_ENVIRONMENT" = production ] && \
+             [ "$PRODUCTION_DEPLOYMENTS_ENABLED" != true ]; then
+            echo "Production deployments are disabled by environment configuration." >&2
+            exit 1
+          fi
+          if [ "$AWS_REGION" != eu-west-2 ]; then
+            echo "AWS_REGION must remain eu-west-2 for the documented residency boundary." >&2
+            exit 1
+          fi
+          if ! [[ "$instance_id" =~ ^i-[0-9a-f]{8,17}$ ]]; then
+            echo "The selected environment has no valid instance ID for this service." >&2
+            exit 1
+          fi
+          if ! [[ "$DEPLOYMENT_BUCKET" =~ ^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$ ]]; then
+            echo "DEPLOYMENT_BUCKET is missing or invalid." >&2
+            exit 1
+          fi
+          if ! [[ "$role_arn" =~ ^arn:aws:iam::([0-9]{12}):role/[A-Za-z0-9+=,.@_/-]+$ ]]; then
+            echo "The selected environment has no valid service deployment role ARN." >&2
+            exit 1
+          fi
+          account_id="${BASH_REMATCH[1]}"
+
+          bucket_arn="arn:aws:s3:::$DEPLOYMENT_BUCKET"
+          object_arn="$bucket_arn/deployments/$TARGET_ENVIRONMENT/$SERVICE/$GITHUB_SHA/*"
+          instance_arn="arn:aws:ec2:$AWS_REGION:$account_id:instance/$instance_id"
+          document_arn="arn:aws:ssm:$AWS_REGION::document/AWS-RunShellScript"
+
+          # A session policy cannot add permissions to the role; it only narrows
+          # them for this run to one artifact prefix, document, and instance.
+          session_policy="$(jq --compact-output --null-input \
+            --arg bucket "$bucket_arn" \
+            --arg object "$object_arn" \
+            --arg instance "$instance_arn" \
+            --arg document "$document_arn" \
+            --arg environment "$TARGET_ENVIRONMENT" \
+            --arg service "$service_tag" \
+            '{
+              Version: "2012-10-17",
+              Statement: [
+                {
+                  Sid: "WriteRunArtifact",
+                  Effect: "Allow",
+                  Action: "s3:PutObject",
+                  Resource: $object
+                },
+                {
+                  Sid: "ReadArtifactBucketLocation",
+                  Effect: "Allow",
+                  Action: "s3:GetBucketLocation",
+                  Resource: $bucket
+                },
+                {
+                  Sid: "UseApprovedCommandDocument",
+                  Effect: "Allow",
+                  Action: "ssm:SendCommand",
+                  Resource: $document
+                },
+                {
+                  Sid: "CommandMatchingInstance",
+                  Effect: "Allow",
+                  Action: "ssm:SendCommand",
+                  Resource: $instance,
+                  Condition: {
+                    StringEquals: {
+                      "ssm:resourceTag/Environment": $environment,
+                      "ssm:resourceTag/Service": $service,
+                      "ssm:resourceTag/Project": "ocean-across-payroll"
+                    }
+                  }
+                },
+                {
+                  Sid: "ReadOwnCommandStatusAndVerifyTarget",
+                  Effect: "Allow",
+                  Action: [
+                    "ec2:DescribeInstances",
+                    "ssm:DescribeInstanceInformation",
+                    "ssm:GetCommandInvocation"
+                  ],
+                  Resource: "*"
+                }
+              ]
+            }')"
+
+          printf 'account_id=%s\n' "$account_id" >> "$GITHUB_OUTPUT"
+          printf 'instance_id=%s\n' "$instance_id" >> "$GITHUB_OUTPUT"
+          printf 'role_arn=%s\n' "$role_arn" >> "$GITHUB_OUTPUT"
+          printf 'service_tag=%s\n' "$service_tag" >> "$GITHUB_OUTPUT"
+          printf 'session_policy=%s\n' "$session_policy" >> "$GITHUB_OUTPUT"
+
+      # OIDC provides short-lived credentials. The role trust policy must match
+      # this repository and the exact dev/production GitHub Environment subject.
+      - name: Obtain short-lived AWS credentials
+        uses: aws-actions/configure-aws-credentials@633526dcc9c26211a4282d6d8de3d8b5cb7ad07b # v6
+        with:
+          role-to-assume: ${{ steps.target.outputs.role_arn }}
+          aws-region: ${{ vars.AWS_REGION }}
+          allowed-account-ids: ${{ steps.target.outputs.account_id }}
+          inline-session-policy: ${{ steps.target.outputs.session_policy }}
+          role-duration-seconds: 900
+          role-session-name: gha-${{ github.run_id }}-${{ github.run_attempt }}
+          mask-aws-account-id: true
+          output-credentials: false
+          unset-current-credentials: true
+          retry-max-attempts: 3
+          action-timeout-s: 120
+
+      - name: Verify tagged and online deployment target
+        env:
+          SERVICE_TAG: ${{ steps.target.outputs.service_tag }}
+          TARGET_ENVIRONMENT: ${{ needs.build-and-test.outputs.target_environment }}
+          INSTANCE_ID: ${{ steps.target.outputs.instance_id }}
+        run: |
+          set -euo pipefail
+          match_count="$(aws ec2 describe-instances \
+            --instance-ids "$INSTANCE_ID" \
+            --filters \
+              "Name=instance-state-name,Values=running" \
+              "Name=tag:Environment,Values=$TARGET_ENVIRONMENT" \
+              "Name=tag:Service,Values=$SERVICE_TAG" \
+              "Name=tag:Project,Values=ocean-across-payroll" \
+            --query 'length(Reservations[].Instances[])' \
+            --output text)"
+          if [ "$match_count" != 1 ]; then
+            echo "The configured instance does not match the required environment, service, and project tags." >&2
+            exit 1
+          fi
+
+          ping_status="$(aws ssm describe-instance-information \
+            --filters "Key=InstanceIds,Values=$INSTANCE_ID" \
+            --query 'InstanceInformationList[0].PingStatus' \
+            --output text)"
+          if [ "$ping_status" != Online ]; then
+            echo "The configured instance is not online in Systems Manager." >&2
+            exit 1
+          fi
+
+      # The S3 bucket is a dedicated deployment store, not the payroll document
+      # bucket. Its resource policy must enforce TLS, encryption, block public
+      # access, and grant the instance role read-only access to its service prefix.
+      - name: Upload immutable encrypted deployment artifact
+        env:
+          SERVICE: ${{ needs.build-and-test.outputs.service }}
+          TARGET_ENVIRONMENT: ${{ needs.build-and-test.outputs.target_environment }}
+          DEPLOYMENT_BUCKET: ${{ vars.DEPLOYMENT_BUCKET }}
+          IMAGE_DIGEST: ${{ needs.build-and-test.outputs.image_digest }}
+        run: |
+          set -euo pipefail
+          artifact_key="deployments/$TARGET_ENVIRONMENT/$SERVICE/$GITHUB_SHA/$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT/image.tar.gz"
+          checksum_b64="$(printf '%s' "$IMAGE_DIGEST" | xxd -r -p | base64 --wrap=0)"
+          aws s3api put-object \
+            --bucket "$DEPLOYMENT_BUCKET" \
+            --key "$artifact_key" \
+            --body "$RUNNER_TEMP/image-bundle/image.tar.gz" \
+            --if-none-match '*' \
+            --server-side-encryption AES256 \
+            --checksum-sha256 "$checksum_b64" \
+            --metadata "git-sha=$GITHUB_SHA,service=$SERVICE,environment=$TARGET_ENVIRONMENT" \
+            > /dev/null
+
+      - name: Deploy through SSM Run Command
+        env:
+          SERVICE: ${{ needs.build-and-test.outputs.service }}
+          TARGET_ENVIRONMENT: ${{ needs.build-and-test.outputs.target_environment }}
+          IMAGE_NAME: ${{ needs.build-and-test.outputs.image_name }}
+          IMAGE_DIGEST: ${{ needs.build-and-test.outputs.image_digest }}
+          INSTANCE_ID: ${{ steps.target.outputs.instance_id }}
+          DEPLOYMENT_BUCKET: ${{ vars.DEPLOYMENT_BUCKET }}
+        run: |
+          set -euo pipefail
+          artifact_key="deployments/$TARGET_ENVIRONMENT/$SERVICE/$GITHUB_SHA/$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT/image.tar.gz"
+
+          # This script contains no secrets. A quoted heredoc and positional
+          # arguments prevent workflow values from being evaluated while it is built.
+          cat > "$RUNNER_TEMP/remote-deploy.sh" <<'REMOTE_SCRIPT'
+          set -euo pipefail
+          umask 027
+
+          service="$1"
+          target_environment="$2"
+          image_name="$3"
+          deployment_bucket="$4"
+          artifact_key="$5"
+          expected_digest="$6"
+
+          [[ "$service" =~ ^(frontend|backend|ai)$ ]]
+          [[ "$target_environment" =~ ^(dev|production)$ ]]
+          [[ "$image_name" =~ ^ocean-across-(frontend|backend|ai):[0-9a-f]{40}$ ]]
+          [[ "$deployment_bucket" =~ ^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$ ]]
+          [[ "$artifact_key" =~ ^deployments/(dev|production)/(frontend|backend|ai)/[0-9a-f]{40}/[0-9]+-[0-9]+/image.tar.gz$ ]]
+          [[ "$expected_digest" =~ ^[0-9a-f]{64}$ ]]
+
+          release_dir="/opt/ocean-across/$service/releases/$expected_digest"
+          install -d -m 0750 "$release_dir"
+          aws s3 cp "s3://$deployment_bucket/$artifact_key" \
+            "$release_dir/image.tar.gz" --only-show-errors
+          actual_digest="$(sha256sum "$release_dir/image.tar.gz" | cut -d ' ' -f 1)"
+          [ "$actual_digest" = "$expected_digest" ]
+          gzip --decompress --stdout "$release_dir/image.tar.gz" | docker load
+          docker image inspect "$image_name" > /dev/null
+
+          run_container() {
+            local container_name="$1"
+            local host_port="$2"
+            local image="$3"
+            docker run --detach \
+              --name "$container_name" \
+              --restart unless-stopped \
+              --read-only \
+              --tmpfs /tmp:rw,noexec,nosuid,size=16m \
+              --cap-drop ALL \
+              --security-opt no-new-privileges:true \
+              --pids-limit 128 \
+              --memory 256m \
+              --env "PORTAL_TYPE=$service" \
+              --publish "127.0.0.1:$host_port:8080" \
+              "$image" > /dev/null
+          }
+
+          wait_for_health() {
+            local host_port="$1"
+            for attempt in {1..15}; do
+              if curl --fail --silent "http://127.0.0.1:$host_port/health" > /dev/null; then
+                return 0
+              fi
+              sleep 2
+            done
+            return 1
+          }
+
+          active_container="ocean-across-$service"
+          candidate_container="$active_container-candidate"
+          docker rm --force "$candidate_container" 2>/dev/null || true
+
+          # Prove the candidate is healthy before touching the active container.
+          run_container "$candidate_container" 18080 "$image_name"
+          if ! wait_for_health 18080; then
+            docker rm --force "$candidate_container" > /dev/null
+            echo "Candidate container failed its health check." >&2
+            exit 1
+          fi
+
+          previous_image="$(docker inspect --format '{{.Config.Image}}' "$active_container" 2>/dev/null || true)"
+          docker rm --force "$candidate_container" > /dev/null
+          docker rm --force "$active_container" 2>/dev/null || true
+          run_container "$active_container" 8080 "$image_name"
+
+          if ! wait_for_health 8080; then
+            docker rm --force "$active_container" > /dev/null
+            if [ -n "$previous_image" ] && docker image inspect "$previous_image" > /dev/null 2>&1; then
+              run_container "$active_container" 8080 "$previous_image"
+            fi
+            echo "Deployment failed its final health check; rollback was attempted." >&2
+            exit 1
+          fi
+          REMOTE_SCRIPT
+
+          script_b64="$(base64 --wrap=0 "$RUNNER_TEMP/remote-deploy.sh")"
+          printf -v remote_command \
+            "printf '%%s' %q | base64 --decode | bash -s -- %q %q %q %q %q %q" \
+            "$script_b64" \
+            "$SERVICE" \
+            "$TARGET_ENVIRONMENT" \
+            "$IMAGE_NAME" \
+            "$DEPLOYMENT_BUCKET" \
+            "$artifact_key" \
+            "$IMAGE_DIGEST"
+          parameters="$(jq --compact-output --null-input \
+            --arg command "$remote_command" \
+            '{commands: [$command]}')"
+
+          command_id="$(aws ssm send-command \
+            --instance-ids "$INSTANCE_ID" \
+            --document-name AWS-RunShellScript \
+            --document-version "\$DEFAULT" \
+            --comment "Deploy $SERVICE $GITHUB_SHA to $TARGET_ENVIRONMENT" \
+            --parameters "$parameters" \
+            --timeout-seconds 600 \
+            --max-concurrency 1 \
+            --max-errors 0 \
+            --query 'Command.CommandId' \
+            --output text)"
+
+          # Print status only. Remote stdout, application logs, environment
+          # variables, and command content are deliberately excluded from CI logs.
+          for attempt in {1..120}; do
+            status="$(aws ssm get-command-invocation \
+              --command-id "$command_id" \
+              --instance-id "$INSTANCE_ID" \
+              --query Status \
+              --output text 2>/dev/null || true)"
+            case "$status" in
+              Success)
+                echo "SSM deployment completed successfully."
+                exit 0
+                ;;
+              Failed|Cancelled|TimedOut|Cancelling)
+                echo "SSM deployment failed with status $status (command $command_id)." >&2
+                exit 1
+                ;;
+            esac
+            sleep 5
+          done
+
+          echo "Timed out waiting for SSM command $command_id." >&2
+          exit 1
