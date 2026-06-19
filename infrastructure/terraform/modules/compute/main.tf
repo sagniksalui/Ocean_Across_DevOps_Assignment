@@ -53,8 +53,9 @@ resource "aws_instance" "portal" {
   iam_instance_profile        = var.instance_profile_names[each.key]
   associate_public_ip_address = false
   user_data = templatefile("${path.module}/templates/user_data.sh.tftpl", {
-    environment = var.environment
-    portal      = each.key
+    deployment_script = file("${path.module}/templates/deploy_container.sh")
+    environment       = var.environment
+    portal            = each.key
   })
   user_data_replace_on_change = true
 

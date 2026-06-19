@@ -265,21 +265,6 @@ variable "alert_email" {
   }
 }
 
-variable "sns_kms_key_arn" {
-  description = "Optional customer-managed KMS key ARN for SNS encryption; its key policy must allow CloudWatch publishing."
-  type        = string
-  default     = null
-  nullable    = true
-
-  validation {
-    condition = (
-      var.sns_kms_key_arn == null ||
-      can(regex("^arn:aws[a-zA-Z-]*:kms:[a-z0-9-]+:[0-9]{12}:key/[0-9a-fA-F-]{36}$", var.sns_kms_key_arn))
-    )
-    error_message = "sns_kms_key_arn must be null or a customer-managed KMS key ARN."
-  }
-}
-
 variable "s3_noncurrent_version_retention_days" {
   description = "Days to retain noncurrent S3 object versions before expiration."
   type        = number

@@ -2,7 +2,7 @@
 
 - **Status:** Proposed
 - **Date:** 2026-06-19
-- **Last amended:** 2026-06-19 (private application subnet requirement)
+- **Last amended:** 2026-06-19 (implementation-status corrections)
 - **Decision owners:** DevOps and application security
 - **Scope:** Assignment reference architecture; not a production approval
 
@@ -101,8 +101,10 @@ NAT is an alternative where endpoint-only egress is insufficient.
 
 Companies, Bureaus, and Employees will each have a separate private EC2 instance,
 instance profile, security group, application subnet/NACL, SSM parameter path,
-CloudWatch log group, S3 prefix, and deployment target. Instances will be tagged
-with `Portal`, `Environment`, `DataClassification`, and `ManagedBy`.
+CloudWatch application/infrastructure log groups, and S3 prefix. The repository
+does not map the workflow's Frontend/Backend/AI targets to these portal hosts.
+Instances are tagged with `Portal`, `Environment`, `DataClassification`, and
+`ManagedBy`.
 
 Instances use Amazon Linux 2023, encrypted gp3 root volumes, required IMDSv2,
 no public IP, and no SSH key pair. User data contains no secrets and prepares a
@@ -142,16 +144,17 @@ Use a shared database and shared schema with mandatory immutable tenant keys:
   bureau-to-company assignment table.
 - Employee requests are restricted by both `company_id` and `employee_id`.
 
-PostgreSQL Row Level Security (RLS) is enabled and forced on tenant-owned tables.
-Each portal uses a separate, non-owner database role without `SUPERUSER` or
-`BYPASSRLS`. After authentication, the application derives tenant context from
-verified server-side identity and membership data, then sets it with `SET LOCAL`
-inside a database transaction. Client-supplied tenant headers are not trusted.
-Connection pools must roll back and clear transaction state before reuse. A
-separate migration role owns schema changes and is unavailable to the runtime.
+The application/database design requires PostgreSQL Row Level Security (RLS) on
+every tenant-owned table and separate non-owner database roles without
+`SUPERUSER` or `BYPASSRLS`. These tables, policies, roles, migrations, and
+cross-tenant integration tests are not implemented in this infrastructure
+repository. A future application must derive tenant context from verified
+server-side identity and membership data, set it transaction-locally, reject
+client-supplied tenant headers, and clear transaction state before pool reuse.
 
-RDS requires TLS using `rds.force_ssl`; clients use certificate verification,
-not encryption without peer validation.
+RDS requires TLS using `rds.force_ssl`. Database-client certificate verification
+is a requirement but is not demonstrated by the placeholder application, which
+does not connect to PostgreSQL.
 
 **Trade-off:** Shared-schema RLS fits one micro RDS instance and centralizes
 migrations, but a database policy or privileged-role error has a broad blast
@@ -194,8 +197,9 @@ buckets for high-risk tenants, customer-managed KMS keys, and malware scanning.
 
 ### 7. IAM Role Boundaries
 
-Create three application instance roles and three corresponding deployment
-roles. Application roles share only the AWS-documented minimal Session Manager
+Terraform creates three application instance roles. Three corresponding
+deployment roles are required by the intended workflow but are not provisioned
+in this repository. Application roles share only the minimal Session Manager
 channel actions plus the message transport operations required for SSM Run
 Command; unlike `AmazonSSMManagedInstanceCore`, the custom policy does not grant
 account-wide Parameter Store reads. Data and logging access are defined
@@ -209,11 +213,12 @@ Each application role may:
 - Use Session Manager without accepting inbound administrative ports. The
   required message-channel actions cannot be resource-scoped.
 
-GitHub deployment roles trust GitHub's OIDC provider and constrain the trust
-policy to the exact repository, `main` branch or protected GitHub environment,
-and expected workflow. A deployment role may upload only its portal artifact and
-send an approved SSM document only to an instance carrying the matching portal
-tag. It cannot read payroll documents or application secrets.
+Any separately provisioned GitHub deployment roles must trust GitHub's OIDC
+provider only for the exact repository, protected branch/environment, and
+workflow. They must be limited to one artifact prefix and tagged target and must
+not read payroll documents or application secrets. The workflow applies an
+inline session-policy ceiling, but that is not evidence that the external base
+roles or trust policies are correctly configured.
 
 Policies avoid wildcard resources where AWS supports resource scoping. Human
 administration and Terraform execution are separate from application roles.
@@ -265,12 +270,11 @@ AWS-managed SSM encryption key for other assignment secrets. Both approaches
 keep plaintext out of Git, Terraform inputs, EC2 user data, Docker images,
 GitHub Actions, and command output.
 
-Terraform defines parameter names and IAM permissions but does not set secret
-values. Secrets are inserted through a separate authorized bootstrap process.
-Applications retrieve only their portal path at runtime and hold values in
-memory. Logs and error handlers must redact secrets. The RDS master credential
-is used only for bootstrap and migrations; runtime roles have narrower database
-credentials. Rotation and emergency revocation are documented and tested.
+Terraform defines IAM access to parameter paths but creates no SSM parameter
+values. A future authorized bootstrap process must create `SecureString` values,
+and applications must retrieve only their portal path at runtime without logging
+values. Narrower runtime database credentials, rotation, and emergency
+revocation are required but are not implemented or tested here.
 
 **Trade-off:** RDS-managed Secrets Manager credentials incur a per-secret charge
 but avoid plaintext Terraform state and provide managed rotation. Production
@@ -280,17 +284,20 @@ performed through Terraform because state can retain values.
 
 ### 10. CI/CD Deployment
 
-GitHub Actions runs validation, unit tests, and a Docker build on every push to
-`main`. Path filters and reusable workflows select Companies, Bureaus, or
-Employees independently. Production GitHub environments require review.
+GitHub Actions checks Terraform formatting and validation, runs unit tests, a
+Docker build, and endpoint smoke tests on every push to `main`. Manual dispatch
+selects Frontend, Backend, or AI and a target environment; this service taxonomy
+is not mapped to the Companies, Bureaus, and Employees EC2 topology. Deployment
+is skipped unless a manual run explicitly enables it.
 
-The intended workflow authenticates to AWS using OIDC, exports the tested Docker image as
-a compressed archive, calculates a digest, and uploads it to the portal's S3
-artifact prefix under the immutable Git commit SHA. It then invokes SSM Run
-Command on the matching tagged EC2 instance. The host downloads the exact
-artifact, verifies its digest, loads it, performs a health check, and retains the
-previous image for rollback. Deployment commands contain references and digests,
-not secret values. The application retrieves secrets locally at runtime.
+When manually enabled, the intended workflow requests AWS credentials using
+OIDC, exports the tested image, verifies a digest, uploads it to a dedicated S3
+artifact prefix, and invokes SSM on a tagged instance. The artifact bucket,
+OIDC roles, instance read policy, target mapping, and private service connectivity
+are external prerequisites and are not created by this Terraform. The
+Terraform-managed, account-owned SSM document invokes a fixed root-owned script with
+validated parameters. This narrows command execution but does not make the
+unprovisioned external roles, artifact path, or target mapping production-ready.
 
 SSM remains preferred over SSH because it requires no inbound management port,
 host key distribution, or private SSH key in GitHub. However, SSM Run Command,
@@ -306,12 +313,13 @@ rollouts, automated rollback, and deployment provenance attestations.
 
 ## Monitoring Consequences
 
-Each portal has a distinct CloudWatch log group and CPU/status-check alarms. RDS
-has CPU, free storage, and database-connection alarms. Critical alarms publish
-to an encrypted operational SNS topic with confirmed subscriptions. Logs use a
-finite retention period and must exclude payroll payloads, bank details,
-authentication tokens, and secrets. EC2 agent logs will not reach CloudWatch in
-the base network until endpoint or egress connectivity is added.
+Each portal has distinct application and infrastructure CloudWatch log groups
+and an EC2 CPU alarm. RDS has a database-connection alarm. Missing metrics are
+treated as breaching. Alarm and recovery events publish to an operational SNS
+topic; email delivery is optional and requires confirmation. The assignment does
+not add KMS for SNS because KMS is outside its permitted service list, so alert
+payloads must contain no PII, payroll values, credentials, or secrets. No agent
+or log driver delivers EC2 logs in the base network.
 
 Within the allowed services, this provides basic detection but not a full audit
 or threat-detection platform. Production should add CloudTrail, AWS Config,
@@ -322,8 +330,9 @@ automated detection of `RDS publicly_accessible = true`.
 
 ### Positive
 
-- Cross-portal compute, IAM, S3, secret, deployment, and log boundaries are
-  explicit and independently reviewable.
+- Cross-portal compute, IAM, S3, parameter-path, and log-group boundaries are
+  explicit and independently reviewable; customer-level data and deployment
+  boundaries remain design requirements.
 - RDS is unreachable from the public internet.
 - The intended CI/CD design has no static cloud or host credentials and exposes
   no management port.

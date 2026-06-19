@@ -104,6 +104,5 @@ module "monitoring" {
   ec2_cpu_threshold_percent = var.ec2_cpu_threshold_percent
   rds_connection_threshold  = var.rds_connection_threshold
   alert_email               = var.alert_email
-  sns_kms_key_arn           = var.sns_kms_key_arn
   common_tags               = local.common_tags
 }

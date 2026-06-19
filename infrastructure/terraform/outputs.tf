@@ -73,6 +73,16 @@ output "portal_instance_profile_names" {
   value       = module.iam.portal_instance_profile_names
 }
 
+output "deployment_document_arn" {
+  description = "ARN of the account-owned, parameter-validated SSM deployment document."
+  value       = module.iam.deployment_document_arn
+}
+
+output "deployment_document_name" {
+  description = "Name of the account-owned SSM deployment document."
+  value       = module.iam.deployment_document_name
+}
+
 output "monitoring_alarm_names" {
   description = "Names of all EC2 and RDS CloudWatch alarms."
   value       = module.monitoring.alarm_names
@@ -89,13 +99,18 @@ output "rds_database_connections_alarm_name" {
 }
 
 output "critical_alerts_sns_topic_arn" {
-  description = "ARN of the encrypted SNS topic used for critical operational alerts."
+  description = "ARN of the non-sensitive operational alert topic."
   value       = module.monitoring.sns_topic_arn
 }
 
 output "portal_log_group_names" {
   description = "CloudWatch application log group name keyed by portal."
   value       = module.monitoring.portal_log_group_names
+}
+
+output "infrastructure_log_group_names" {
+  description = "CloudWatch infrastructure log group name keyed by portal."
+  value       = module.monitoring.infrastructure_log_group_names
 }
 
 output "rds_instance_id" {

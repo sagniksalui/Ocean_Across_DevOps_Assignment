@@ -1,4 +1,4 @@
-name: Build, test, and deploy
+name: Build, test, and optional deploy
 
 "on":
   push:
@@ -28,6 +28,11 @@ name: Build, test, and deploy
         required: false
         default: ""
         type: string
+      perform_deployment:
+        description: Run the SSM deployment job after build and test
+        required: true
+        default: false
+        type: boolean
 
 # The default token is read-only. Only the deployment job can request an OIDC
 # identity token, which it exchanges for short-lived AWS credentials.
@@ -35,6 +40,33 @@ permissions:
   contents: read
 
 jobs:
+  terraform-checks:
+    name: Terraform format and validate
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e # v4.0.1
+        with:
+          terraform_version: "1.15.5"
+          terraform_wrapper: false
+
+      - name: Check Terraform formatting
+        run: terraform -chdir=infrastructure/terraform fmt -check -recursive
+
+      - name: Initialize providers without remote state
+        run: terraform -chdir=infrastructure/terraform init -backend=false -lockfile=readonly
+
+      - name: Validate Terraform configuration
+        run: terraform -chdir=infrastructure/terraform validate
+
   build-and-test:
     name: Build and test
     runs-on: ubuntu-24.04
@@ -141,6 +173,7 @@ jobs:
       # GitHub's temporary artifact connects the jobs. The deploy job rechecks
       # this digest before obtaining AWS credentials or uploading executable code.
       - name: Package Docker image
+        if: github.event_name == 'workflow_dispatch' && inputs.perform_deployment
         id: package
         env:
           IMAGE_NAME: ${{ steps.selection.outputs.image_name }}
@@ -154,6 +187,7 @@ jobs:
           printf 'image_digest=%s\n' "$image_digest" >> "$GITHUB_OUTPUT"
 
       - name: Upload image bundle for deployment job
+        if: github.event_name == 'workflow_dispatch' && inputs.perform_deployment
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: image-${{ steps.selection.outputs.service }}-${{ github.sha }}-${{ github.run_id }}
@@ -163,7 +197,13 @@ jobs:
 
   deploy:
     name: Deploy ${{ needs.build-and-test.outputs.service }} to ${{ needs.build-and-test.outputs.target_environment }}
-    needs: build-and-test
+    needs:
+      - build-and-test
+      - terraform-checks
+    # Pushes to main always stop after build and test. Live deployment is an
+    # explicit manual action because its AWS roles, artifact bucket, private
+    # connectivity, and target mapping are external assignment prerequisites.
+    if: github.event_name == 'workflow_dispatch' && inputs.perform_deployment
     runs-on: ubuntu-24.04
     timeout-minutes: 20
 
@@ -267,7 +307,8 @@ jobs:
           bucket_arn="arn:aws:s3:::$DEPLOYMENT_BUCKET"
           object_arn="$bucket_arn/deployments/$TARGET_ENVIRONMENT/$SERVICE/$GITHUB_SHA/*"
           instance_arn="arn:aws:ec2:$AWS_REGION:$account_id:instance/$instance_id"
-          document_arn="arn:aws:ssm:$AWS_REGION::document/AWS-RunShellScript"
+          document_name="$TARGET_ENVIRONMENT-ocean-across-deploy"
+          document_arn="arn:aws:ssm:$AWS_REGION:$account_id:document/$document_name"
 
           # A session policy cannot add permissions to the role; it only narrows
           # them for this run to one artifact prefix, document, and instance.
@@ -329,6 +370,7 @@ jobs:
           printf 'instance_id=%s\n' "$instance_id" >> "$GITHUB_OUTPUT"
           printf 'role_arn=%s\n' "$role_arn" >> "$GITHUB_OUTPUT"
           printf 'service_tag=%s\n' "$service_tag" >> "$GITHUB_OUTPUT"
+          printf 'document_name=%s\n' "$document_name" >> "$GITHUB_OUTPUT"
           printf 'session_policy=%s\n' "$session_policy" >> "$GITHUB_OUTPUT"
 
       # OIDC provides short-lived credentials. The role trust policy must match
@@ -409,112 +451,30 @@ jobs:
           IMAGE_DIGEST: ${{ needs.build-and-test.outputs.image_digest }}
           INSTANCE_ID: ${{ steps.target.outputs.instance_id }}
           DEPLOYMENT_BUCKET: ${{ vars.DEPLOYMENT_BUCKET }}
+          DOCUMENT_NAME: ${{ steps.target.outputs.document_name }}
         run: |
           set -euo pipefail
           artifact_key="deployments/$TARGET_ENVIRONMENT/$SERVICE/$GITHUB_SHA/$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT/image.tar.gz"
 
-          # This script contains no secrets. A quoted heredoc and positional
-          # arguments prevent workflow values from being evaluated while it is built.
-          cat > "$RUNNER_TEMP/remote-deploy.sh" <<'REMOTE_SCRIPT'
-          set -euo pipefail
-          umask 027
-
-          service="$1"
-          target_environment="$2"
-          image_name="$3"
-          deployment_bucket="$4"
-          artifact_key="$5"
-          expected_digest="$6"
-
-          [[ "$service" =~ ^(frontend|backend|ai)$ ]]
-          [[ "$target_environment" =~ ^(dev|production)$ ]]
-          [[ "$image_name" =~ ^ocean-across-(frontend|backend|ai):[0-9a-f]{40}$ ]]
-          [[ "$deployment_bucket" =~ ^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$ ]]
-          [[ "$artifact_key" =~ ^deployments/(dev|production)/(frontend|backend|ai)/[0-9a-f]{40}/[0-9]+-[0-9]+/image.tar.gz$ ]]
-          [[ "$expected_digest" =~ ^[0-9a-f]{64}$ ]]
-
-          release_dir="/opt/ocean-across/$service/releases/$expected_digest"
-          install -d -m 0750 "$release_dir"
-          aws s3 cp "s3://$deployment_bucket/$artifact_key" \
-            "$release_dir/image.tar.gz" --only-show-errors
-          actual_digest="$(sha256sum "$release_dir/image.tar.gz" | cut -d ' ' -f 1)"
-          [ "$actual_digest" = "$expected_digest" ]
-          gzip --decompress --stdout "$release_dir/image.tar.gz" | docker load
-          docker image inspect "$image_name" > /dev/null
-
-          run_container() {
-            local container_name="$1"
-            local host_port="$2"
-            local image="$3"
-            docker run --detach \
-              --name "$container_name" \
-              --restart unless-stopped \
-              --read-only \
-              --tmpfs /tmp:rw,noexec,nosuid,size=16m \
-              --cap-drop ALL \
-              --security-opt no-new-privileges:true \
-              --pids-limit 128 \
-              --memory 256m \
-              --env "PORTAL_TYPE=$service" \
-              --publish "127.0.0.1:$host_port:8080" \
-              "$image" > /dev/null
-          }
-
-          wait_for_health() {
-            local host_port="$1"
-            for attempt in {1..15}; do
-              if curl --fail --silent "http://127.0.0.1:$host_port/health" > /dev/null; then
-                return 0
-              fi
-              sleep 2
-            done
-            return 1
-          }
-
-          active_container="ocean-across-$service"
-          candidate_container="$active_container-candidate"
-          docker rm --force "$candidate_container" 2>/dev/null || true
-
-          # Prove the candidate is healthy before touching the active container.
-          run_container "$candidate_container" 18080 "$image_name"
-          if ! wait_for_health 18080; then
-            docker rm --force "$candidate_container" > /dev/null
-            echo "Candidate container failed its health check." >&2
-            exit 1
-          fi
-
-          previous_image="$(docker inspect --format '{{.Config.Image}}' "$active_container" 2>/dev/null || true)"
-          docker rm --force "$candidate_container" > /dev/null
-          docker rm --force "$active_container" 2>/dev/null || true
-          run_container "$active_container" 8080 "$image_name"
-
-          if ! wait_for_health 8080; then
-            docker rm --force "$active_container" > /dev/null
-            if [ -n "$previous_image" ] && docker image inspect "$previous_image" > /dev/null 2>&1; then
-              run_container "$active_container" 8080 "$previous_image"
-            fi
-            echo "Deployment failed its final health check; rollback was attempted." >&2
-            exit 1
-          fi
-          REMOTE_SCRIPT
-
-          script_b64="$(base64 --wrap=0 "$RUNNER_TEMP/remote-deploy.sh")"
-          printf -v remote_command \
-            "printf '%%s' %q | base64 --decode | bash -s -- %q %q %q %q %q %q" \
-            "$script_b64" \
-            "$SERVICE" \
-            "$TARGET_ENVIRONMENT" \
-            "$IMAGE_NAME" \
-            "$DEPLOYMENT_BUCKET" \
-            "$artifact_key" \
-            "$IMAGE_DIGEST"
+          # The account-owned document validates these values and invokes only
+          # the fixed root-owned deployment script installed by Terraform.
           parameters="$(jq --compact-output --null-input \
-            --arg command "$remote_command" \
-            '{commands: [$command]}')"
+            --arg service "$SERVICE" \
+            --arg image_name "$IMAGE_NAME" \
+            --arg deployment_bucket "$DEPLOYMENT_BUCKET" \
+            --arg artifact_key "$artifact_key" \
+            --arg expected_digest "$IMAGE_DIGEST" \
+            '{
+              Service: [$service],
+              ImageName: [$image_name],
+              DeploymentBucket: [$deployment_bucket],
+              ArtifactKey: [$artifact_key],
+              ExpectedDigest: [$expected_digest]
+            }')"
 
           command_id="$(aws ssm send-command \
             --instance-ids "$INSTANCE_ID" \
-            --document-name AWS-RunShellScript \
+            --document-name "$DOCUMENT_NAME" \
             --document-version "\$DEFAULT" \
             --comment "Deploy $SERVICE $GITHUB_SHA to $TARGET_ENVIRONMENT" \
             --parameters "$parameters" \

@@ -1,15 +1,18 @@
-# AI Usage Log
+# AI Interaction Log
 
-This log records AI assistance used while preparing the assignment. Entries must
-be updated whenever another AI prompt is used.
+This document records how AI was used as an assistant while preparing the assignment. The AI output was not treated as authoritative: it was reviewed and adapted for security, cost, maintainability, and assignment fit. Exact prompts below come only from the existing recorded interaction history. Bracketed placeholders mark decisions that require the author to confirm in their own words; they are not invented.
 
-## Entry 1 - Assignment Planning
+> **Submission status:** This file is not complete while any `[PLACEHOLDER: ...]`
+> text remains. The author must review each interaction and record their own
+> acceptance, changes, rejection, and rationale before submission.
+
+## Prompt 1 - Assignment Planning
 
 **Date:** 2026-06-19
 
 **Tool:** OpenAI Codex
 
-**Exact prompt:**
+**Exact prompt used:**
 
 > You are acting as a senior DevOps engineer reviewing a technical assignment.
 >
@@ -43,7 +46,7 @@ be updated whenever another AI prompt is used.
 >
 > Assume I may not deploy live AWS resources, so the output must be valid and well-structured IaC, but deployment is optional.
 
-**Response or key output used:**
+**Summary of AI output:**
 
 The response decomposed the assignment into Terraform, documentation,
 application, CI/CD, monitoring, runbook, compliance, and AI-log deliverables. It
@@ -52,7 +55,13 @@ portal type and actual customer tenant, recommended PostgreSQL RLS and SSM
 deployment, listed production-versus-assignment trade-offs, and proposed a
 security-first implementation order.
 
-**Changes, adaptations, or rejections:**
+**What I accepted:**
+
+I accepted the reviewed output that is reflected in the repository and summarized above. [PLACEHOLDER: confirm or narrow this statement in your own words.]
+
+**What I changed:**
+
+The previous usage record captured the following implementation decisions and adaptations. [PLACEHOLDER: keep only items you personally changed and move accepted or rejected items to the matching field.]
 
 - Retained the recommendation to make tenancy and threat-model decisions before
   Terraform implementation.
@@ -63,13 +72,21 @@ security-first implementation order.
   strict service constraint: private EC2 cannot use SSM without NAT or VPC
   endpoints.
 
-## Entry 2 - Architecture Decision Record
+**What I rejected:**
+
+[PLACEHOLDER: identify any suggestions you did not use. Write `None` only if that is accurate.]
+
+**Why the change or rejection was necessary:**
+
+The recorded adaptations were made to improve security, cost control, maintainability, or assignment fit. [PLACEHOLDER: add any interaction-specific rationale not already captured above.]
+
+## Prompt 2 - Architecture Decision Record
 
 **Date:** 2026-06-19
 
 **Tool:** OpenAI Codex
 
-**Exact prompt:**
+**Exact prompt used:**
 
 > Create an Architecture Decision Record for this assignment.
 >
@@ -104,7 +121,7 @@ security-first implementation order.
 >
 > Be explicit about trade-offs and explain what would be improved in production.
 
-**Response or key output used:**
+**Summary of AI output:**
 
 Created `docs/decisions/ADR-0001-security-first-aws-architecture.md`. The ADR
 selects `eu-west-2`, portal-specific public subnet groups for the constrained
@@ -114,7 +131,13 @@ controls, SSM SecureString parameters, and GitHub OIDC plus S3/SSM deployment.
 It records alternatives, residual risks, production improvements, and acceptance
 tests.
 
-**Changes, adaptations, or rejections:**
+**What I accepted:**
+
+I accepted the reviewed output that is reflected in the repository and summarized above. [PLACEHOLDER: confirm or narrow this statement in your own words.]
+
+**What I changed:**
+
+The previous usage record captured the following implementation decisions and adaptations. [PLACEHOLDER: keep only items you personally changed and move accepted or rejected items to the matching field.]
 
 - Used public EC2 instances only for the constrained assessment because private
   instances require NAT or VPC endpoints to reach SSM and CloudWatch.
@@ -127,13 +150,21 @@ tests.
 - Used a separate S3 deployment-artifact bucket rather than mixing executable
   artifacts with payroll documents.
 
-## Entry 3 - Terraform Repository Scaffold
+**What I rejected:**
+
+[PLACEHOLDER: identify any suggestions you did not use. Write `None` only if that is accurate.]
+
+**Why the change or rejection was necessary:**
+
+The recorded adaptations were made to improve security, cost control, maintainability, or assignment fit. [PLACEHOLDER: add any interaction-specific rationale not already captured above.]
+
+## Prompt 3 - Terraform Repository Scaffold
 
 **Date:** 2026-06-19
 
 **Tool:** OpenAI Codex
 
-**Exact prompt:**
+**Exact prompt used:**
 
 > Generate a Terraform repository scaffold for the assignment.
 >
@@ -161,7 +192,7 @@ tests.
 >
 > Do not overcomplicate it. This is for a technical assignment where clarity, security reasoning, and maintainability matter.
 
-**Response or key output used:**
+**Summary of AI output:**
 
 Created the root Terraform scaffold under `infrastructure/terraform`, including
 AWS provider constraints, shared tags, typed and validated non-secret variables,
@@ -169,7 +200,13 @@ root module calls, a non-sensitive summary output, and an example tfvars file.
 Created `main.tf`, `variables.tf`, and `outputs.tf` placeholders for networking,
 security, compute, database, storage, IAM, and monitoring modules.
 
-**Changes, adaptations, or rejections:**
+**What I accepted:**
+
+I accepted the reviewed output that is reflected in the repository and summarized above. [PLACEHOLDER: confirm or narrow this statement in your own words.]
+
+**What I changed:**
+
+The previous usage record captured the following implementation decisions and adaptations. [PLACEHOLDER: keep only items you personally changed and move accepted or rejected items to the matching field.]
 
 - Kept module resource files intentionally empty except for scope comments; this
   step defines structure and contracts rather than prematurely implementing AWS
@@ -183,13 +220,21 @@ security, compute, database, storage, IAM, and monitoring modules.
 - Did not add credentials, database passwords, secret values, backend state, or
   deployment-specific account identifiers.
 
-## Entry 4 - Terraform Networking Module
+**What I rejected:**
+
+[PLACEHOLDER: identify any suggestions you did not use. Write `None` only if that is accurate.]
+
+**Why the change or rejection was necessary:**
+
+The recorded adaptations were made to improve security, cost control, maintainability, or assignment fit. [PLACEHOLDER: add any interaction-specific rationale not already captured above.]
+
+## Prompt 4 - Terraform Networking Module
 
 **Date:** 2026-06-19
 
 **Tool:** OpenAI Codex
 
-**Exact prompt:**
+**Exact prompt used:**
 
 > # Context from my IDE setup:
 >
@@ -213,7 +258,7 @@ security, compute, database, storage, IAM, and monitoring modules.
 > Important:
 > The platform handles sensitive payroll and bank data, so private resources must not be publicly routable.
 
-**Response or key output used:**
+**Summary of AI output:**
 
 Implemented the networking module with one VPC, dynamic selection of two AZs,
 two public ingress-placeholder subnets, one private application subnet per
@@ -221,7 +266,13 @@ portal, and two private database subnets. Added an internet gateway and public
 default route, while private application and database route tables retain only
 VPC-local routing. Added root and module outputs for VPC, subnet IDs, and CIDRs.
 
-**Changes, adaptations, or rejections:**
+**What I accepted:**
+
+I accepted the reviewed output that is reflected in the repository and summarized above. [PLACEHOLDER: confirm or narrow this statement in your own words.]
+
+**What I changed:**
+
+The previous usage record captured the following implementation decisions and adaptations. [PLACEHOLDER: keep only items you personally changed and move accepted or rejected items to the matching field.]
 
 - Replaced the scaffold's portal-specific public subnet model with two public
   ingress placeholders and moved portal compute to private subnets.
@@ -236,13 +287,21 @@ VPC-local routing. Added root and module outputs for VPC, subnet IDs, and CIDRs.
 - Ran Terraform 1.10.5 formatting and validation with the signed AWS provider
   selected in `.terraform.lock.hcl`; the final configuration passed both checks.
 
-## Entry 5 - Security Groups and Network ACLs
+**What I rejected:**
+
+[PLACEHOLDER: identify any suggestions you did not use. Write `None` only if that is accurate.]
+
+**Why the change or rejection was necessary:**
+
+The recorded adaptations were made to improve security, cost control, maintainability, or assignment fit. [PLACEHOLDER: add any interaction-specific rationale not already captured above.]
+
+## Prompt 5 - Security Groups and Network ACLs
 
 **Date:** 2026-06-19
 
 **Tool:** OpenAI Codex
 
-**Exact prompt:**
+**Exact prompt used:**
 
 > # Context from my IDE setup:
 >
@@ -268,7 +327,7 @@ VPC-local routing. Added root and module outputs for VPC, subnet IDs, and CIDRs.
 >
 > Keep the rules understandable for an evaluator.
 
-**Response or key output used:**
+**Summary of AI output:**
 
 Implemented separate Companies, Bureaus, and Employees application security
 groups, a future load-balancer security group, and a PostgreSQL security group.
@@ -276,7 +335,13 @@ RDS ingress uses application security-group references on port 5432 rather than
 CIDRs. Implemented one NACL per portal application subnet and one database NACL,
 including explicit cross-portal denies and stateless return rules.
 
-**Changes, adaptations, or rejections:**
+**What I accepted:**
+
+I accepted the reviewed output that is reflected in the repository and summarized above. [PLACEHOLDER: confirm or narrow this statement in your own words.]
+
+**What I changed:**
+
+The previous usage record captured the following implementation decisions and adaptations. [PLACEHOLDER: keep only items you personally changed and move accepted or rejected items to the matching field.]
 
 - Preserved the repository's plural portal keys (`companies`, `bureaus`, and
   `employees`) while implementing the three requested portal boundaries.
@@ -292,13 +357,21 @@ including explicit cross-portal denies and stateless return rules.
 - Corrected a duplicate Terraform resource label found by the first validation
   run. The formatted final configuration passes `terraform validate`.
 
-## Entry 6 - Terraform Compute Module
+**What I rejected:**
+
+[PLACEHOLDER: identify any suggestions you did not use. Write `None` only if that is accurate.]
+
+**Why the change or rejection was necessary:**
+
+The recorded adaptations were made to improve security, cost control, maintainability, or assignment fit. [PLACEHOLDER: add any interaction-specific rationale not already captured above.]
+
+## Prompt 6 - Terraform Compute Module
 
 **Date:** 2026-06-19
 
 **Tool:** OpenAI Codex
 
-**Exact prompt:**
+**Exact prompt used:**
 
 > # Context from my IDE setup:
 >
@@ -325,7 +398,7 @@ including explicit cross-portal denies and stateless return rules.
 >
 > The goal is to reflect compute-layer isolation between the three user types.
 
-**Response or key output used:**
+**Summary of AI output:**
 
 Implemented one private EC2 instance for each of the Companies, Bureaus, and
 Employees portal maps. Each receives its matching private subnet, security
@@ -333,7 +406,13 @@ group, and IAM instance profile. Added Amazon Linux 2023 discovery with an
 optional pinned AMI, encrypted gp3 root volumes, required IMDSv2, portal and
 ownership tags, secret-free Docker bootstrap, and keyed ID/private-IP outputs.
 
-**Changes, adaptations, or rejections:**
+**What I accepted:**
+
+I accepted the reviewed output that is reflected in the repository and summarized above. [PLACEHOLDER: confirm or narrow this statement in your own words.]
+
+**What I changed:**
+
+The previous usage record captured the following implementation decisions and adaptations. [PLACEHOLDER: keep only items you personally changed and move accepted or rejected items to the matching field.]
 
 - Preserved the repository's plural portal keys while representing the three
   requested portal types.
@@ -353,13 +432,21 @@ ownership tags, secret-free Docker bootstrap, and keyed ID/private-IP outputs.
   current AWS documentation.
 - Ran recursive Terraform formatting and validation successfully.
 
-## Entry 7 - Terraform RDS PostgreSQL Module
+**What I rejected:**
+
+[PLACEHOLDER: identify any suggestions you did not use. Write `None` only if that is accurate.]
+
+**Why the change or rejection was necessary:**
+
+The recorded adaptations were made to improve security, cost control, maintainability, or assignment fit. [PLACEHOLDER: add any interaction-specific rationale not already captured above.]
+
+## Prompt 7 - Terraform RDS PostgreSQL Module
 
 **Date:** 2026-06-19
 
 **Tool:** OpenAI Codex
 
-**Exact prompt:**
+**Exact prompt used:**
 
 > # Context from my IDE setup:
 >
@@ -384,7 +471,7 @@ ownership tags, secret-free Docker bootstrap, and keyed ID/private-IP outputs.
 >
 > Also include comments explaining how the database is protected at rest and from public internet access.
 
-**Response or key output used:**
+**Summary of AI output:**
 
 Implemented an encrypted Single-AZ RDS PostgreSQL `db.t3.micro` instance in the
 two private database subnets, attached only to the existing RDS security group.
@@ -392,7 +479,13 @@ Added forced PostgreSQL TLS, seven-day backups, environment-aware deletion
 protection, production final-snapshot behavior, RDS-managed Secrets Manager
 credentials, and sensitive endpoint/secret-ARN outputs.
 
-**Changes, adaptations, or rejections:**
+**What I accepted:**
+
+I accepted the reviewed output that is reflected in the repository and summarized above. [PLACEHOLDER: confirm or narrow this statement in your own words.]
+
+**What I changed:**
+
+The previous usage record captured the following implementation decisions and adaptations. [PLACEHOLDER: keep only items you personally changed and move accepted or rejected items to the matching field.]
 
 - Used PostgreSQL 16 as a major-version default after verifying current RDS
   support in AWS documentation; minor upgrades remain automatic.
@@ -411,13 +504,21 @@ credentials, and sensitive endpoint/secret-ARN outputs.
   and enhanced monitoring; this is not presented as production availability.
 - Ran recursive Terraform formatting and validation successfully.
 
-## Entry 8 - Terraform S3 Storage Module
+**What I rejected:**
+
+[PLACEHOLDER: identify any suggestions you did not use. Write `None` only if that is accurate.]
+
+**Why the change or rejection was necessary:**
+
+The recorded adaptations were made to improve security, cost control, maintainability, or assignment fit. [PLACEHOLDER: add any interaction-specific rationale not already captured above.]
+
+## Prompt 8 - Terraform S3 Storage Module
 
 **Date:** 2026-06-19
 
 **Tool:** OpenAI Codex
 
-**Exact prompt:**
+**Exact prompt used:**
 
 > # Context from my IDE setup:
 >
@@ -445,7 +546,7 @@ credentials, and sensitive endpoint/secret-ARN outputs.
 > - Add lifecycle policy examples if appropriate, but keep them simple.
 > - Include comments explaining how S3 prefix isolation acts as a second boundary if application logic fails.
 
-**Response or key output used:**
+**Summary of AI output:**
 
 Implemented one versioned, SSE-S3 encrypted payroll-document bucket with
 bucket-owner-enforced ownership and full public-access blocking. Added separate
@@ -453,7 +554,13 @@ Companies, Bureaus, and Employees inline IAM policies, explicit cross-prefix
 bucket-policy denies, mandatory TLS, and a simple noncurrent-version and
 multipart-upload lifecycle rule.
 
-**Changes, adaptations, or rejections:**
+**What I accepted:**
+
+I accepted the reviewed output that is reflected in the repository and summarized above. [PLACEHOLDER: confirm or narrow this statement in your own words.]
+
+**What I changed:**
+
+The previous usage record captured the following implementation decisions and adaptations. [PLACEHOLDER: keep only items you personally changed and move accepted or rejected items to the matching field.]
 
 - Used a generated bucket-name suffix to satisfy S3 global uniqueness without
   embedding account identifiers.
@@ -470,13 +577,21 @@ multipart-upload lifecycle rule.
   `companies/`; tenant-specific keys and authorization remain necessary.
 - Ran recursive Terraform formatting and validation successfully.
 
-## Entry 9 - S3 Policy Security Review
+**What I rejected:**
+
+[PLACEHOLDER: identify any suggestions you did not use. Write `None` only if that is accurate.]
+
+**Why the change or rejection was necessary:**
+
+The recorded adaptations were made to improve security, cost control, maintainability, or assignment fit. [PLACEHOLDER: add any interaction-specific rationale not already captured above.]
+
+## Prompt 9 - S3 Policy Security Review
 
 **Date:** 2026-06-19
 
 **Tool:** OpenAI Codex
 
-**Exact prompt:**
+**Exact prompt used:**
 
 > # Context from my IDE setup:
 >
@@ -487,7 +602,7 @@ multipart-upload lifecycle rule.
 > ## My request for Codex:
 > Review the S3 policy you generated. Identify any statement that could accidentally allow cross-tenant access, list bucket-wide access, or public access. Then provide a corrected least-privilege policy.
 
-**Response or key output used:**
+**Summary of AI output:**
 
 Reviewed and corrected the generated identity and bucket policies. The original
 policy had no public allow and conditioned bucket listing by prefix, but its
@@ -495,7 +610,13 @@ cross-prefix explicit deny covered only the current object action list. The
 corrected resource policy denies each portal role from every object namespace
 except its own, denies out-of-prefix listing, and denies bucket administration.
 
-**Changes, adaptations, or rejections:**
+**What I accepted:**
+
+I accepted the reviewed output that is reflected in the repository and summarized above. [PLACEHOLDER: confirm or narrow this statement in your own words.]
+
+**What I changed:**
+
+The previous usage record captured the following implementation decisions and adaptations. [PLACEHOLDER: keep only items you personally changed and move accepted or rejected items to the matching field.]
 
 - Identified that the original claim about surviving any future broad identity
   policy was too strong because omitted S3 object actions were not explicitly
@@ -515,13 +636,21 @@ except its own, denies out-of-prefix listing, and denies bucket administration.
   credentials or trusted session tags and cannot be provided by this shared EC2
   role alone.
 
-## Entry 10 - Terraform IAM Module
+**What I rejected:**
+
+[PLACEHOLDER: identify any suggestions you did not use. Write `None` only if that is accurate.]
+
+**Why the change or rejection was necessary:**
+
+The recorded adaptations were made to improve security, cost control, maintainability, or assignment fit. [PLACEHOLDER: add any interaction-specific rationale not already captured above.]
+
+## Prompt 10 - Terraform IAM Module
 
 **Date:** 2026-06-19
 
 **Tool:** OpenAI Codex
 
-**Exact prompt:**
+**Exact prompt used:**
 
 > # Context from my IDE setup:
 >
@@ -548,14 +677,20 @@ except its own, denies out-of-prefix listing, and denies bucket administration.
 >
 > Add comments explaining the security boundary created by IAM.
 
-**Response or key output used:**
+**Summary of AI output:**
 
 Completed the IAM module with separate Companies, Bureaus, and Employees EC2
 roles and instance profiles. Added portal-specific S3 object/list permissions,
 Parameter Store paths, CloudWatch Logs groups, minimal Session Manager channel
 permissions, and the independent S3 bucket policy guardrails.
 
-**Changes, adaptations, or rejections:**
+**What I accepted:**
+
+I accepted the reviewed output that is reflected in the repository and summarized above. [PLACEHOLDER: confirm or narrow this statement in your own words.]
+
+**What I changed:**
+
+The previous usage record captured the following implementation decisions and adaptations. [PLACEHOLDER: keep only items you personally changed and move accepted or rejected items to the matching field.]
 
 - Moved the S3 identity and bucket policies from the storage module into IAM so
   permission ownership is centralized and module dependencies remain acyclic.
@@ -580,13 +715,21 @@ permissions, and the independent S3 bucket policy guardrails.
 - Ran recursive Terraform formatting and validation successfully.
 - I accepted the modular Terraform structure because it makes the infrastructure easier to review. I rejected overly complex module abstractions because the assignment values clarity and explanation over production-scale complexity.
 
-## Entry 11 - Dockerized Placeholder Backend
+**What I rejected:**
+
+[PLACEHOLDER: identify any suggestions you did not use. Write `None` only if that is accurate.]
+
+**Why the change or rejection was necessary:**
+
+The recorded adaptations were made to improve security, cost control, maintainability, or assignment fit. [PLACEHOLDER: add any interaction-specific rationale not already captured above.]
+
+## Prompt 11 - Dockerized Placeholder Backend
 
 **Date:** 2026-06-19
 
 **Tool:** OpenAI Codex
 
-**Exact prompt:**
+**Exact prompt used:**
 
 > # Context from my IDE setup:
 >
@@ -611,13 +754,19 @@ permissions, and the independent S3 bucket policy guardrails.
 >
 > The purpose is to test build, test, and deployment flow, not to implement business functionality.
 
-**Response or key output used:**
+**Summary of AI output:**
 
 Created a dependency-free Python placeholder backend with `/health` and
 `/portal` JSON endpoints, a non-root Alpine-based Docker image, Docker health
 check, focused build context, and standard-library unit tests.
 
-**Changes, adaptations, or rejections:**
+**What I accepted:**
+
+I accepted the reviewed output that is reflected in the repository and summarized above. [PLACEHOLDER: confirm or narrow this statement in your own words.]
+
+**What I changed:**
+
+The previous usage record captured the following implementation decisions and adaptations. [PLACEHOLDER: keep only items you personally changed and move accepted or rejected items to the matching field.]
 
 - Chose the Python standard library instead of a web framework so CI unit tests
   require no package installation or lockfile maintenance.
@@ -635,13 +784,21 @@ check, focused build context, and standard-library unit tests.
   host denied access to `/var/run/docker.sock`, so the image build was not
   verified in this environment.
 
-## Entry 12 - GitHub Actions CI/CD Workflow
+**What I rejected:**
+
+[PLACEHOLDER: identify any suggestions you did not use. Write `None` only if that is accurate.]
+
+**Why the change or rejection was necessary:**
+
+The recorded adaptations were made to improve security, cost control, maintainability, or assignment fit. [PLACEHOLDER: add any interaction-specific rationale not already captured above.]
+
+## Prompt 12 - GitHub Actions CI/CD Workflow
 
 **Date:** 2026-06-19
 
 **Tool:** OpenAI Codex
 
-**Exact prompt:**
+**Exact prompt used:**
 
 > # Context from my IDE setup:
 >
@@ -674,13 +831,19 @@ check, focused build context, and standard-library unit tests.
 > - how environment-specific config is selected
 > - how teams can deploy independently without interfering with each other
 
-**Response or key output used:**
+**Summary of AI output:**
 
 Created a two-job GitHub Actions workflow that tests and builds the placeholder
 application, transfers the tested image without a paid container registry, and
 deploys an independently selected service to EC2 through SSM Run Command.
 
-**Changes, adaptations, or rejections:**
+**What I accepted:**
+
+I accepted the reviewed output that is reflected in the repository and summarized above. [PLACEHOLDER: confirm or narrow this statement in your own words.]
+
+**What I changed:**
+
+The previous usage record captured the following implementation decisions and adaptations. [PLACEHOLDER: keep only items you personally changed and move accepted or rejected items to the matching field.]
 
 - A push to `main` deploys the backend to `dev`; manual runs select frontend,
   backend, or AI and either the dev or production GitHub Environment.
@@ -700,13 +863,21 @@ deploys an independently selected service to EC2 through SSM Run Command.
   OIDC role, encrypted deployment bucket, S3 artifact read permissions on each
   selected EC2 role, and private SSM/S3 connectivity or controlled egress.
 
-## Entry 13 - GitHub Actions Security Audit and Hardening
+**What I rejected:**
+
+[PLACEHOLDER: identify any suggestions you did not use. Write `None` only if that is accurate.]
+
+**Why the change or rejection was necessary:**
+
+The recorded adaptations were made to improve security, cost control, maintainability, or assignment fit. [PLACEHOLDER: add any interaction-specific rationale not already captured above.]
+
+## Prompt 13 - GitHub Actions Security Audit and Hardening
 
 **Date:** 2026-06-19
 
 **Tool:** OpenAI Codex
 
-**Exact prompt:**
+**Exact prompt used:**
 
 > # Context from my IDE setup:
 >
@@ -717,13 +888,19 @@ deploys an independently selected service to EC2 through SSM Run Command.
 > ## My request for Codex:
 > Audit this GitHub Actions workflow for secret exposure, unsafe shell commands, overly broad AWS permissions, and accidental production deployment risk. Then provide a hardened version.
 
-**Response or key output used:**
+**Summary of AI output:**
 
 Audited the workflow and replaced it with a fail-closed version that pins action
 SHAs, separates service deployment roles, caps each AWS session, verifies the
 target and artifact, and adds explicit production and container rollout guards.
 
-**Changes, adaptations, or rejections:**
+**What I accepted:**
+
+I accepted the reviewed output that is reflected in the repository and summarized above. [PLACEHOLDER: confirm or narrow this statement in your own words.]
+
+**What I changed:**
+
+The previous usage record captured the following implementation decisions and adaptations. [PLACEHOLDER: keep only items you personally changed and move accepted or rejected items to the matching field.]
 
 - Identified mutable action tags, one shared AWS deployment role, unverified EC2
   targets, optional-only production gates, paired artifact/checksum trust, and
@@ -753,13 +930,21 @@ target and artifact, and adds explicit production and container rollout guards.
   not per-team GitHub authorization; strong team separation needs service-specific
   environments or reusable workflows with distinct approval and OIDC boundaries.
 
-## Entry 14 - Terraform Monitoring Module
+**What I rejected:**
+
+[PLACEHOLDER: identify any suggestions you did not use. Write `None` only if that is accurate.]
+
+**Why the change or rejection was necessary:**
+
+The recorded adaptations were made to improve security, cost control, maintainability, or assignment fit. [PLACEHOLDER: add any interaction-specific rationale not already captured above.]
+
+## Prompt 14 - Terraform Monitoring Module
 
 **Date:** 2026-06-19
 
 **Tool:** OpenAI Codex
 
-**Exact prompt:**
+**Exact prompt used:**
 
 > # Context from my IDE setup:
 >
@@ -784,13 +969,19 @@ target and artifact, and adds explicit production and container rollout guards.
 >
 > Explain in comments how these alarms support incident readiness.
 
-**Response or key output used:**
+**Summary of AI output:**
 
 Implemented portal-specific CloudWatch log groups, EC2 CPU and RDS connection
 alarms, a restricted SNS critical-alert topic, and an optional confirmed email
 subscription with root and module outputs.
 
-**Changes, adaptations, or rejections:**
+**What I accepted:**
+
+I accepted the reviewed output that is reflected in the repository and summarized above. [PLACEHOLDER: confirm or narrow this statement in your own words.]
+
+**What I changed:**
+
+The previous usage record captured the following implementation decisions and adaptations. [PLACEHOLDER: keep only items you personally changed and move accepted or rejected items to the matching field.]
 
 - Used the repository's canonical `companies`, `bureaus`, and `employees` keys
   so log group names remain compatible with the existing portal IAM policies.
@@ -811,13 +1002,21 @@ subscription with root and module outputs.
 - Exposed portal log group names, per-portal CPU alarms, the RDS alarm, the full
   alarm list, and the critical SNS topic ARN from the module and root stack.
 
-## Entry 15 - README Multi-Tenancy Architecture
+**What I rejected:**
+
+[PLACEHOLDER: identify any suggestions you did not use. Write `None` only if that is accurate.]
+
+**Why the change or rejection was necessary:**
+
+The recorded adaptations were made to improve security, cost control, maintainability, or assignment fit. [PLACEHOLDER: add any interaction-specific rationale not already captured above.]
+
+## Prompt 15 - README Multi-Tenancy Architecture
 
 **Date:** 2026-06-19
 
 **Tool:** OpenAI Codex
 
-**Exact prompt:**
+**Exact prompt used:**
 
 > # Context from my IDE setup:
 >
@@ -845,13 +1044,19 @@ subscription with root and module outputs.
 >
 > Use a security-first tone. Include trade-offs.
 
-**Response or key output used:**
+**Summary of AI output:**
 
 Created a root README with a security-first multi-tenancy architecture covering
 the pooled data model, verified request context, PostgreSQL RLS, AWS boundaries,
 tenant lifecycle processes, and production trade-offs.
 
-**Changes, adaptations, or rejections:**
+**What I accepted:**
+
+I accepted the reviewed output that is reflected in the repository and summarized above. [PLACEHOLDER: confirm or narrow this statement in your own words.]
+
+**What I changed:**
+
+The previous usage record captured the following implementation decisions and adaptations. [PLACEHOLDER: keep only items you personally changed and move accepted or rejected items to the matching field.]
 
 - Defined Company as the primary payroll data tenant, Bureau as a delegated
   tenant acting only for assigned Companies, and Employee as a Company-scoped
@@ -874,13 +1079,21 @@ tenant lifecycle processes, and production trade-offs.
 - Used current official PostgreSQL, GOV.UK, and ICO guidance for RLS, PAYE record
   retention, storage limitation, and the non-absolute right to erasure.
 
-## Entry 16 - Unsafe and Safe Tenant Query Examples
+**What I rejected:**
+
+[PLACEHOLDER: identify any suggestions you did not use. Write `None` only if that is accurate.]
+
+**Why the change or rejection was necessary:**
+
+The recorded adaptations were made to improve security, cost control, maintainability, or assignment fit. [PLACEHOLDER: add any interaction-specific rationale not already captured above.]
+
+## Prompt 16 - Unsafe and Safe Tenant Query Examples
 
 **Date:** 2026-06-19
 
 **Tool:** OpenAI Codex
 
-**Exact prompt:**
+**Exact prompt used:**
 
 > # Context from my IDE setup:
 >
@@ -891,13 +1104,19 @@ tenant lifecycle processes, and production trade-offs.
 > ## My request for Codex:
 > Add an example unsafe query and then show the corrected safe version using tenant_id and PostgreSQL Row-Level Security. Explain why relying only on application WHERE clauses is not sufficient for payroll data.
 
-**Response or key output used:**
+**Summary of AI output:**
 
 Expanded the README with a parameterized but tenant-unsafe payroll query, a
 corrected transaction-scoped `tenant_id` query, and the corresponding forced RLS
 policy.
 
-**Changes, adaptations, or rejections:**
+**What I accepted:**
+
+I accepted the reviewed output that is reflected in the repository and summarized above. [PLACEHOLDER: confirm or narrow this statement in your own words.]
+
+**What I changed:**
+
+The previous usage record captured the following implementation decisions and adaptations. [PLACEHOLDER: keep only items you personally changed and move accepted or rejected items to the matching field.]
 
 - Deliberately made the unsafe query parameterized to show that preventing SQL
   injection does not establish tenant authorization when `tenant_id` is absent.
@@ -914,13 +1133,21 @@ policy.
 - Retained the limitation that RLS does not replace parameterized SQL,
   least-privilege non-owner roles, or negative cross-tenant testing.
 
-## Entry 17 - Public RDS Incident Response Runbook
+**What I rejected:**
+
+[PLACEHOLDER: identify any suggestions you did not use. Write `None` only if that is accurate.]
+
+**Why the change or rejection was necessary:**
+
+The recorded adaptations were made to improve security, cost control, maintainability, or assignment fit. [PLACEHOLDER: add any interaction-specific rationale not already captured above.]
+
+## Prompt 17 - Public RDS Incident Response Runbook
 
 **Date:** 2026-06-19
 
 **Tool:** OpenAI Codex
 
-**Exact prompt:**
+**Exact prompt used:**
 
 > Write a one-page incident response runbook for this scenario:
 >
@@ -938,13 +1165,19 @@ policy.
 >
 > Keep it practical and suitable for inclusion in a DevOps assignment README.
 
-**Response or key output used:**
+**Summary of AI output:**
 
 Added a practical README runbook for accidental public exposure of the payroll
 RDS PostgreSQL instance, from detection and containment through recovery,
 communications, and recurrence prevention.
 
-**Changes, adaptations, or rejections:**
+**What I accepted:**
+
+I accepted the reviewed output that is reflected in the repository and summarized above. [PLACEHOLDER: confirm or narrow this statement in your own words.]
+
+**What I changed:**
+
+The previous usage record captured the following implementation decisions and adaptations. [PLACEHOLDER: keep only items you personally changed and move accepted or rejected items to the matching field.]
 
 - Classified the event as SEV-1 until effective reachability and unauthorized
   access are disproved, and assigned incident, cloud, database, and DPO roles.
@@ -966,22 +1199,36 @@ communications, and recurrence prevention.
 - Avoided claiming that absent logs prove no access or that public accessibility
   alone proves effective internet reachability.
 
-## Entry 18 - Incident Runbook Control Clarifications
+**What I rejected:**
+
+[PLACEHOLDER: identify any suggestions you did not use. Write `None` only if that is accurate.]
+
+**Why the change or rejection was necessary:**
+
+The recorded adaptations were made to improve security, cost control, maintainability, or assignment fit. [PLACEHOLDER: add any interaction-specific rationale not already captured above.]
+
+## Prompt 18 - Incident Runbook Control Clarifications
 
 **Date:** 2026-06-19
 
 **Tool:** OpenAI Codex
 
-**Exact prompt:**
+**Exact prompt used:**
 
 > Mention AWS Config, CloudTrail, VPC Flow Logs, Security Group review, RDS public accessibility flag, credential rotation, snapshot review, and post-incident lessons learned.
 
-**Response or key output used:**
+**Summary of AI output:**
 
 Updated the incident runbook so every requested detection, containment,
 investigation, recovery, and learning control is directly identifiable.
 
-**Changes, adaptations, or rejections:**
+**What I accepted:**
+
+I accepted the reviewed output that is reflected in the repository and summarized above. [PLACEHOLDER: confirm or narrow this statement in your own words.]
+
+**What I changed:**
+
+The previous usage record captured the following implementation decisions and adaptations. [PLACEHOLDER: keep only items you personally changed and move accepted or rejected items to the matching field.]
 
 - Retained the existing AWS Config, CloudTrail, VPC Flow Logs,
   `PubliclyAccessible` flag, credential rotation, Security Hub, and GuardDuty
@@ -994,13 +1241,21 @@ investigation, recovery, and learning control is directly identifiable.
   control failures, effective responses, owners, deadlines, and document/test
   updates.
 
-## Entry 19 - UK GDPR Compliance README Section
+**What I rejected:**
+
+[PLACEHOLDER: identify any suggestions you did not use. Write `None` only if that is accurate.]
+
+**Why the change or rejection was necessary:**
+
+The recorded adaptations were made to improve security, cost control, maintainability, or assignment fit. [PLACEHOLDER: add any interaction-specific rationale not already captured above.]
+
+## Prompt 19 - UK GDPR Compliance README Section
 
 **Date:** 2026-06-19
 
 **Tool:** OpenAI Codex
 
-**Exact prompt:**
+**Exact prompt used:**
 
 > Write the UK compliance section for the README.
 >
@@ -1022,13 +1277,19 @@ investigation, recovery, and learning control is directly identifiable.
 >
 > Be specific and practical. Avoid claiming that AWS services alone guarantee GDPR compliance.
 
-**Response or key output used:**
+**Summary of AI output:**
 
 Added a practical UK GDPR README section covering AWS technical controls,
 enforceable UK-region residency, and a verified cross-service employee erasure
 workflow without treating AWS service use as proof of compliance.
 
-**Changes, adaptations, or rejections:**
+**What I accepted:**
+
+I accepted the reviewed output that is reflected in the repository and summarized above. [PLACEHOLDER: confirm or narrow this statement in your own words.]
+
+**What I changed:**
+
+The previous usage record captured the following implementation decisions and adaptations. [PLACEHOLDER: keep only items you personally changed and move accepted or rejected items to the matching field.]
 
 - Separated controls already implemented by the assignment from production
   additions such as CloudTrail, Config, Security Hub, GuardDuty, Macie, Access
@@ -1051,13 +1312,21 @@ workflow without treating AWS service use as proof of compliance.
 - Used current official AWS, ICO, and GOV.UK sources and noted that ICO erasure
   guidance is under review following the Data (Use and Access) Act 2025.
 
-## Entry 20 - Mermaid AWS Architecture Diagram
+**What I rejected:**
+
+[PLACEHOLDER: identify any suggestions you did not use. Write `None` only if that is accurate.]
+
+**Why the change or rejection was necessary:**
+
+The recorded adaptations were made to improve security, cost control, maintainability, or assignment fit. [PLACEHOLDER: add any interaction-specific rationale not already captured above.]
+
+## Prompt 20 - Mermaid AWS Architecture Diagram
 
 **Date:** 2026-06-19
 
 **Tool:** OpenAI Codex
 
-**Exact prompt:**
+**Exact prompt used:**
 
 > Create a Mermaid architecture diagram for this AWS payroll platform.
 >
@@ -1086,13 +1355,19 @@ workflow without treating AWS service use as proof of compliance.
 >
 > Generate Mermaid syntax suitable for README.md.
 
-**Response or key output used:**
+**Summary of AI output:**
 
 Added a Mermaid flowchart to the README showing the two-AZ VPC, isolated portal
 compute, private database tier, managed AWS services, monitoring, and intended
 OIDC/SSM deployment flow.
 
-**Changes, adaptations, or rejections:**
+**What I accepted:**
+
+I accepted the reviewed output that is reflected in the repository and summarized above. [PLACEHOLDER: confirm or narrow this statement in your own words.]
+
+**What I changed:**
+
+The previous usage record captured the following implementation decisions and adaptations. [PLACEHOLDER: keep only items you personally changed and move accepted or rejected items to the matching field.]
 
 - Represented public, private application, and private database tiers as distinct
   styled security boundaries inside the VPC.
@@ -1113,13 +1388,21 @@ OIDC/SSM deployment flow.
 - Used dashed arrows and an explanatory note for the unprovisioned ingress tier
   and live SSM/S3 path, which still requires VPC endpoints or controlled egress.
 
-## Entry 21 - Complete Assignment README
+**What I rejected:**
+
+[PLACEHOLDER: identify any suggestions you did not use. Write `None` only if that is accurate.]
+
+**Why the change or rejection was necessary:**
+
+The recorded adaptations were made to improve security, cost control, maintainability, or assignment fit. [PLACEHOLDER: add any interaction-specific rationale not already captured above.]
+
+## Prompt 21 - Complete Assignment README
 
 **Date:** 2026-06-19
 
 **Tool:** OpenAI Codex
 
-**Exact prompt:**
+**Exact prompt used:**
 
 > Assemble a complete README.md for this assignment.
 >
@@ -1142,13 +1425,19 @@ OIDC/SSM deployment flow.
 >
 > Do not claim resources were deployed unless there is evidence.
 
-**Response or key output used:**
+**Summary of AI output:**
 
 Consolidated the repository's architecture, operations, security, compliance,
 setup, and cleanup material into an evaluator-ready README grounded in the
 implemented files and documented limitations.
 
-**Changes, adaptations, or rejections:**
+**What I accepted:**
+
+I accepted the reviewed output that is reflected in the repository and summarized above. [PLACEHOLDER: confirm or narrow this statement in your own words.]
+
+**What I changed:**
+
+The previous usage record captured the following implementation decisions and adaptations. [PLACEHOLDER: keep only items you personally changed and move accepted or rejected items to the matching field.]
 
 - Added a deployment-status statement that distinguishes implemented IaC from
   evidence of live AWS resources.
@@ -1171,13 +1460,21 @@ implemented files and documented limitations.
   protection and snapshots, Terraform destroy plans, out-of-band resources,
   legal holds, and post-destroy verification.
 
-## Entry 22 - Repository Security and DevOps Review
+**What I rejected:**
+
+[PLACEHOLDER: identify any suggestions you did not use. Write `None` only if that is accurate.]
+
+**Why the change or rejection was necessary:**
+
+The recorded adaptations were made to improve security, cost control, maintainability, or assignment fit. [PLACEHOLDER: add any interaction-specific rationale not already captured above.]
+
+## Prompt 22 - Repository Security and DevOps Review
 
 **Date:** 2026-06-19
 
 **Tool:** OpenAI Codex
 
-**Exact prompt:**
+**Exact prompt used:**
 
 > Perform a security and DevOps review of the repository.
 >
@@ -1202,14 +1499,20 @@ implemented files and documented limitations.
 > 4. Exact file to modify.
 > 5. Corrected code snippets where needed.
 
-**Response or key output used:**
+**Summary of AI output:**
 
 Performed a static security and DevOps review of the Terraform modules, GitHub
 Actions workflow, placeholder application, Docker image, documentation, and
 repository artefacts. Reported findings by severity with exact remediation
 targets and representative corrected snippets.
 
-**Changes, adaptations, or rejections:**
+**What I accepted:**
+
+I accepted the reviewed output that is reflected in the repository and summarized above. [PLACEHOLDER: confirm or narrow this statement in your own words.]
+
+**What I changed:**
+
+The previous usage record captured the following implementation decisions and adaptations. [PLACEHOLDER: keep only items you personally changed and move accepted or rejected items to the matching field.]
 
 - Confirmed no hardcoded credentials, private keys, Terraform state, local
   variable files, or environment files were present in the reviewed tree.
@@ -1232,3 +1535,102 @@ targets and representative corrected snippets.
   documented recommendations.
 - Ran all four Python unit tests successfully and parsed the GitHub Actions YAML;
   Terraform and dedicated security scanners were unavailable in the environment.
+
+**What I rejected:**
+
+[PLACEHOLDER: identify any suggestions you did not use. Write `None` only if that is accurate.]
+
+**Why the change or rejection was necessary:**
+
+The recorded adaptations were made to improve security, cost control, maintainability, or assignment fit. [PLACEHOLDER: add any interaction-specific rationale not already captured above.]
+
+## Prompt 23 - Create Structured AI Interaction Log
+
+**Date:** 2026-06-19
+
+**Tool:** OpenAI Codex
+
+**Exact prompt used:**
+
+> Create an ai_log.md file for this assignment.
+>
+> Use the following structure for each AI interaction:
+> - Prompt number
+> - Exact prompt used
+> - Summary of AI output
+> - What I accepted
+> - What I changed
+> - What I rejected
+> - Why the change or rejection was necessary
+>
+> Use a transparent tone. Make it clear that I used AI as an assistant, but I reviewed and adapted the output for security, cost, and assignment fit.
+>
+> Do not invent prompts I did not use. Use placeholders where I need to paste my real prompts.
+
+**Summary of AI output:**
+
+Created `ai_log.md` from the 22 exact prompts already recorded in
+`AI_USAGE_LOG.md`, normalized every interaction to the requested structure, and
+used explicit placeholders where personal acceptance, rejection, or rationale
+could not be established from the repository history.
+
+**What I accepted:**
+
+[PLACEHOLDER: complete this after reviewing the generated `ai_log.md`.]
+
+**What I changed:**
+
+[PLACEHOLDER: record any edits you make to the generated log.]
+
+**What I rejected:**
+
+[PLACEHOLDER: record anything from the generated log that you remove or choose
+not to use. Write `None` only if that is accurate.]
+
+**Why the change or rejection was necessary:**
+
+[PLACEHOLDER: explain your decision in terms of accuracy, transparency,
+security, cost, or assignment fit.]
+
+## Prompt 24 - Strict Review and Corrected Version
+
+**Date:** 2026-06-19
+
+**Tool:** OpenAI Codex
+
+**Exact prompt used:**
+
+> Review your all previous answers as a strict DevOps security reviewer.
+>
+> Do not praise the solution.
+>
+> Find weaknesses, unsafe defaults, missing assignment requirements, unnecessary cost, and places where the README might overclaim.
+>
+> Then provide a corrected version.
+
+**Summary of AI output:**
+
+Re-audited the assignment brief, Terraform, workflow, application, ADR, security
+audit, README, and AI log. Corrected deployment defaults, replaced arbitrary SSM
+shell content with a validated account-owned document and fixed host script,
+added Terraform CI validation and infrastructure log groups, made missing
+metrics alert, removed optional KMS from the cost-constrained baseline, and
+rewrote unsupported implementation claims as explicit design gaps.
+
+**What I accepted:**
+
+[PLACEHOLDER: complete this after reviewing the corrected repository.]
+
+**What I changed:**
+
+[PLACEHOLDER: record any further edits you make to the corrections.]
+
+**What I rejected:**
+
+[PLACEHOLDER: identify corrections you chose not to retain. Write `None` only if
+that is accurate.]
+
+**Why the change or rejection was necessary:**
+
+[PLACEHOLDER: explain your decision in terms of security, cost, correctness, or
+assignment fit.]

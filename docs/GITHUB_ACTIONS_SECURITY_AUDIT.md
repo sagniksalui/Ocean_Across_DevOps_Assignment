@@ -11,6 +11,7 @@
 | High | One `AWS_ROLE_ARN` could require access to all three service targets. The repository does not currently provision or prove that role's policy. | The workflow selects a separate role per service and applies an inline session policy ceiling for one S3 prefix, one SSM document, and one instance. The base roles still must be provisioned with equally narrow policies. |
 | High | A mistyped or changed instance variable could direct a root-equivalent SSM command to the wrong host. | The role session is restricted to the exact instance ARN and matching resource tags. The workflow separately verifies account, running state, project, environment, service, and SSM online status. |
 | High | Production depended entirely on optional GitHub Environment configuration. | Production now requires manual dispatch, protected `main`, the expected workflow ref, exact typed confirmation, an enable flag, and the GitHub Environment gate. |
+| High | A push to `main` could enter the deployment job even though the required private connectivity and AWS dependencies are not provisioned. | Pushes now stop after build and smoke tests; deployment requires manual dispatch and an explicit boolean opt-in. |
 | Medium | The image and checksum could be transported together without re-verification between jobs. | The deploy job verifies the GitHub artifact before obtaining AWS credentials, uploads an immutable SSE-S3 object with an AWS checksum, and passes the expected digest independently through SSM. |
 | Medium | The deployment stopped the active container before proving the replacement healthy. | A restricted candidate container is health-checked first, and the prior image is retained for a best-effort rollback. |
 | Medium | Failure handling printed remote command output and application logs into GitHub logs. | CI now reports only the SSM status and command ID. It does not print remote stdout, stderr, environment variables, or application logs. |
@@ -33,8 +34,9 @@ Set these non-secret Environment variables:
 
 Each OIDC role trust policy must restrict `aud` to `sts.amazonaws.com` and `sub`
 to the exact repository and GitHub Environment. Its permissions must allow only
-the corresponding deployment prefix, tagged instance, approved SSM document,
-and read-only status APIs. The workflow's inline session policy is a permissions
+the corresponding deployment prefix, tagged instance, the exact
+Terraform-created deployment document ARN, and read-only status APIs. The
+workflow's inline session policy is a permissions
 ceiling, not a replacement for a least-privilege base policy.
 
 The session policy uses `Resource: "*"` only for the read-only
@@ -50,9 +52,9 @@ controlled egress; the current no-NAT assessment network does not provide them.
 
 ## Residual Risks
 
-- `AWS-RunShellScript` is root-equivalent on the selected EC2 instance. Production
-  should use a narrowly parameterized, account-owned SSM document and permit only
-  that document ARN.
+- The account-owned SSM document invokes a fixed root-owned host script. Changes
+  to that script, its user-data installation, or document parameters are
+  privileged code changes and require independent review.
 - A digest protects integrity, not publisher identity. Production should sign
   images and verify signatures against an approved KMS-backed identity.
 - The Docker base image is referenced by a moving tag. Pin its digest and add

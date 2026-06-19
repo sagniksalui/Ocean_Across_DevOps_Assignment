@@ -26,14 +26,29 @@ resource "aws_cloudwatch_log_group" "portal" {
   })
 }
 
+# The assignment also asks for infrastructure log groups. This destination is
+# created separately from application logs, but no delivery agent is claimed in
+# the no-egress topology. SSM/OS logs must exclude secrets and payroll content.
+resource "aws_cloudwatch_log_group" "infrastructure" {
+  for_each = toset(var.portals)
+
+  name              = "/ocean-across/${var.environment}/${each.key}/infrastructure"
+  retention_in_days = var.log_retention_days
+
+  tags = merge(var.common_tags, {
+    Name    = "${var.environment}-${each.key}-infrastructure-logs"
+    Portal  = title(each.key)
+    Purpose = "InfrastructureLogging"
+  })
+}
+
 # The topic is the common incident-notification path. Alarm and recovery
-# notifications give responders both detection and closure signals. Production
-# can supply a customer-managed KMS key whose policy permits CloudWatch; using
-# alias/aws/sns here would prevent the CloudWatch service from publishing.
+# notifications give responders both detection and closure signals. SNS payloads
+# must contain operational identifiers only: KMS is outside the assignment's
+# permitted live-deployment service list, so sensitive data is prohibited here.
 resource "aws_sns_topic" "critical_alerts" {
-  name              = "${var.environment}-payroll-critical-alerts"
-  display_name      = "${title(var.environment)} payroll alerts"
-  kms_master_key_id = var.sns_kms_key_arn
+  name         = "${var.environment}-payroll-critical-alerts"
+  display_name = "${title(var.environment)} payroll alerts"
 
   tags = merge(var.common_tags, {
     Name    = "${var.environment}-payroll-critical-alerts"
@@ -126,7 +141,9 @@ resource "aws_cloudwatch_metric_alarm" "ec2_high_cpu" {
   namespace           = "AWS/EC2"
   period              = 300
   statistic           = "Average"
-  treat_missing_data  = "notBreaching"
+  # Missing metrics can mean the instance stopped reporting. Treat that as an
+  # incident signal rather than silently reporting a healthy state.
+  treat_missing_data = "breaching"
 
   dimensions = {
     InstanceId = each.value
@@ -159,7 +176,9 @@ resource "aws_cloudwatch_metric_alarm" "rds_high_connections" {
   namespace           = "AWS/RDS"
   period              = 300
   statistic           = "Average"
-  treat_missing_data  = "notBreaching"
+  # A missing RDS metric can indicate an unavailable or misconfigured database.
+  # Planned maintenance must therefore be coordinated with alert suppression.
+  treat_missing_data = "breaching"
 
   dimensions = {
     DBInstanceIdentifier = var.rds_instance_id

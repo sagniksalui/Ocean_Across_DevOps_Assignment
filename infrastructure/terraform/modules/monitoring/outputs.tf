@@ -5,6 +5,13 @@ output "portal_log_group_names" {
   }
 }
 
+output "infrastructure_log_group_names" {
+  description = "CloudWatch infrastructure log group name keyed by portal."
+  value = {
+    for portal, log_group in aws_cloudwatch_log_group.infrastructure : portal => log_group.name
+  }
+}
+
 output "ec2_cpu_alarm_names" {
   description = "EC2 high-CPU CloudWatch alarm name keyed by portal."
   value = {
@@ -26,6 +33,6 @@ output "alarm_names" {
 }
 
 output "sns_topic_arn" {
-  description = "ARN of the encrypted SNS topic receiving critical alarm state changes."
+  description = "ARN of the operational SNS topic; payloads must not contain payroll data, PII, credentials, or secrets."
   value       = aws_sns_topic.critical_alerts.arn
 }

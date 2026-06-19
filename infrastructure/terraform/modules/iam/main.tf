@@ -32,7 +32,10 @@ locals {
 
   log_group_arns = {
     for portal in var.portals : portal =>
-    "arn:${data.aws_partition.current.partition}:logs:${var.aws_region}:${data.aws_caller_identity.current.account_id}:log-group:/ocean-across/${var.environment}/${portal}:*"
+    [
+      "arn:${data.aws_partition.current.partition}:logs:${var.aws_region}:${data.aws_caller_identity.current.account_id}:log-group:/ocean-across/${var.environment}/${portal}:*",
+      "arn:${data.aws_partition.current.partition}:logs:${var.aws_region}:${data.aws_caller_identity.current.account_id}:log-group:/ocean-across/${var.environment}/${portal}/infrastructure:*",
+    ]
   }
 
   parameter_path_arns = {
@@ -112,6 +115,56 @@ resource "aws_iam_role_policy" "portal_session_manager" {
   policy = data.aws_iam_policy_document.portal_session_manager.json
 }
 
+# This document exposes only validated deployment parameters and invokes a
+# fixed root-owned host script. It avoids granting CI arbitrary shell content
+# through the AWS-managed AWS-RunShellScript document.
+resource "aws_ssm_document" "deploy_container" {
+  name            = "${var.environment}-ocean-across-deploy"
+  document_type   = "Command"
+  document_format = "JSON"
+
+  content = jsonencode({
+    schemaVersion = "2.2"
+    description   = "Deploy a validated Ocean Across container artifact"
+    parameters = {
+      Service = {
+        type          = "String"
+        allowedValues = ["frontend", "backend", "ai"]
+      }
+      ImageName = {
+        type           = "String"
+        allowedPattern = "^ocean-across-(frontend|backend|ai):[0-9a-f]{40}$"
+      }
+      DeploymentBucket = {
+        type           = "String"
+        allowedPattern = "^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$"
+      }
+      ArtifactKey = {
+        type           = "String"
+        allowedPattern = "^deployments/(dev|production)/(frontend|backend|ai)/[0-9a-f]{40}/[0-9]+-[0-9]+/image[.]tar[.]gz$"
+      }
+      ExpectedDigest = {
+        type           = "String"
+        allowedPattern = "^[0-9a-f]{64}$"
+      }
+    }
+    mainSteps = [{
+      action = "aws:runShellScript"
+      name   = "deployContainer"
+      inputs = {
+        runCommand = [
+          "/usr/local/sbin/ocean-across-deploy '{{ Service }}' '{{ ImageName }}' '{{ DeploymentBucket }}' '{{ ArtifactKey }}' '{{ ExpectedDigest }}'",
+        ]
+      }
+    }]
+  })
+
+  tags = merge(var.common_tags, {
+    Name    = "${var.environment}-ocean-across-deploy"
+    Purpose = "ValidatedContainerDeployment"
+  })
+}
+
 # Each role can list only its own logical S3 prefix and access objects only
 # beneath that prefix. No Allow statement uses s3:* or the full object namespace.
 data "aws_iam_policy_document" "portal_documents" {
@@ -188,7 +241,7 @@ data "aws_iam_policy_document" "portal_logging" {
       "logs:DescribeLogStreams",
       "logs:PutLogEvents",
     ]
-    resources = [local.log_group_arns[each.key]]
+    resources = local.log_group_arns[each.key]
   }
 }
 

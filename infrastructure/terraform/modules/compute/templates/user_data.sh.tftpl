@@ -13,6 +13,14 @@ EOF
 chown ec2-user:ec2-user "/opt/ocean-across/${portal}/README.txt"
 chmod 0640 "/opt/ocean-across/${portal}/README.txt"
 
+# SSM may invoke only this fixed, root-owned deployment implementation. The
+# account-owned command document validates every argument before calling it.
+cat > /usr/local/sbin/ocean-across-deploy <<'DEPLOY_SCRIPT'
+${deployment_script}
+DEPLOY_SCRIPT
+chown root:root /usr/local/sbin/ocean-across-deploy
+chmod 0750 /usr/local/sbin/ocean-across-deploy
+
 # Docker installation requires package-repository connectivity. The current
 # no-NAT private subnet topology needs controlled egress, suitable VPC endpoints,
 # or a pre-baked AMI before this bootstrap can complete during a live deployment.

@@ -42,5 +42,4 @@ log_retention_days                   = 30
 ec2_cpu_threshold_percent            = 80
 rds_connection_threshold             = 80
 # alert_email = "platform-alerts@example.com" # Optional; requires SNS email confirmation.
-# sns_kms_key_arn = "arn:aws:kms:eu-west-2:123456789012:key/00000000-0000-0000-0000-000000000000" # Optional CMK with CloudWatch permissions.
 s3_noncurrent_version_retention_days = 90
